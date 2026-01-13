@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  laravel-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel-app
+    volumes:
+      - ./:/var/www/html
+    working_dir: /var/www/html
+    ports:
+      - "8088:80"          # change if 8088 conflicts
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8088
+      DB_CONNECTION: mysql
+      DB_HOST: elitequiz-db      # <-- IMPORTANT: set to your existing mysql container name
+      DB_PORT: 3306              # internal MySQL port
+      DB_DATABASE: vpn_admin    # or your target DB name
+      DB_USERNAME: elite
+      DB_PASSWORD: elite
+    networks:
+      - existing_net
+
+networks:
+  existing_net:
+    external: true
+    name: eliite-quize-admin_default   # Network from elitequiz docker-compose

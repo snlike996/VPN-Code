@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1072818978126",
+    "project_id": "pixi-vpn",
+    "storage_bucket": "pixi-vpn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1072818978126:android:07af452f1c289523c0721f",
+        "android_client_info": {
+          "package_name": "com.app.pixivpngold"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANMbcolmXZNlsKy8Ls8NWXcomicPozFy8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
