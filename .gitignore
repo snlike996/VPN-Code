@@ -2,21 +2,10 @@
 .idea/
 .vscode/
 
-# Node
-node_modules/
-npm-debug.log
-yarn-error.log
-package-lock.json
 
-# Composer
-/vendor/
-/admin/vendor/
-/admin/admin/vendor/
-composer.lock
+
 
 # Laravel
-.env
-.env.backup
 .env.production
 public/storage
 storage/*.key
@@ -35,6 +24,6 @@ android/local.properties
 .LSOverride
 
 # Misc
-*.sql
+
 *.log
 .env copy
