@@ -1,6 +1,6 @@
-# Pixi VPN - 多平台 VPN 系统 + 管理后台
+# TSVPN - 多平台 VPN 系统 + 管理后台
 
-Pixi VPN 是一套功能强大的 VPN 解决方案，包含基于 Laravel 的管理后台和基于 Flutter 的移动端/桌面端应用（支持 Android, iOS, macOS）。
+TSVPN 是一套功能强大的 VPN 解决方案，包含基于 Laravel 的管理后台和基于 Flutter 的移动端/桌面端应用（支持 Android, iOS, macOS）。
 本项目开源并包含所有必须文件，开箱即用。
 
 ## ✨ 主要功能

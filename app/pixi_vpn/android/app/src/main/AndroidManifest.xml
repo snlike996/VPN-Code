@@ -27,7 +27,7 @@
     </queries>
 
     <application
-        android:label="TS VPN"
+        android:label="TSVPN"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
