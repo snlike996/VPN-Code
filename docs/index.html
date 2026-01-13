@@ -1,0 +1,1157 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>文档 — Pixi VPN (CodeCanyon)</title>
+
+  <style>
+    @media only screen and (max-width: 425px) {
+
+      html,
+      body {
+        padding: 5px;
+      }
+    }
+
+    .panel {
+      display: none;
+    }
+
+    /* Show only on mobile screens (max-width: 767px for example) */
+    @media (max-width: 767px) {
+      .panel {
+        display: block;
+        /* or flex/grid depending on your layout */
+      }
+    }
+
+    :root {
+      --sidebar-w: 300px;
+      --gap: 24px;
+      --bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      --nav-bg: linear-gradient(145deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+      --card: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+      --muted: #94a3b8;
+      --accent: #06b6d4;
+      --accent-secondary: #3b82f6;
+      --surface: rgba(15, 23, 42, 0.9);
+      --radius: 16px;
+      --max-width: 1400px;
+      --content-padding: 32px;
+      --glow: 0 0 30px rgba(6, 182, 212, 0.3);
+      --shadow-intense: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      background-attachment: fixed;
+      color: #f1f5f9;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.6;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-x: hidden;
+    }
+
+    /* Animated background particles */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+      animation: drift 20s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translateX(-20px) translateY(-20px) rotate(0deg);
+      }
+
+      100% {
+        transform: translateX(20px) translateY(20px) rotate(2deg);
+      }
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--max-width);
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      gap: var(--gap);
+      align-items: start;
+      position: relative;
+      z-index: 1;
+    }
+
+    nav.sidebar {
+      background: var(--nav-bg);
+      backdrop-filter: blur(20px);
+      border-radius: var(--radius);
+      padding: 24px;
+      height: calc(100vh - 48px);
+      position: sticky;
+      top: 24px;
+      overflow: hidden auto;
+      box-shadow: var(--shadow-intense), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    nav.sidebar:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-intense), var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .brand {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #238062;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        left: -100%;
+      }
+
+      100% {
+        left: 100%;
+      }
+    }
+
+    .brand .logo {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: #0a0f1c;
+      font-size: 20px;
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand .logo::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: logoGlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes logoGlow {
+      0% {
+        transform: rotate(0deg);
+        opacity: 0.5;
+      }
+
+      100% {
+        transform: rotate(180deg);
+        opacity: 1;
+      }
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 700;
+      background: #ffffff;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .brand p {
+      margin: 0;
+      font-size: 12px;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    .menu {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .menu a {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 12px;
+      color: #e2e8f0;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .menu a::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .menu a:hover::before {
+      opacity: 1;
+    }
+
+    .menu a .icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .menu a:hover {
+      transform: translateX(8px);
+      color: #ffffff;
+    }
+
+    .menu a:hover .icon {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+      transform: scale(1.1);
+    }
+
+    .menu a.active {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.15));
+      color: #ffffff;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.2);
+    }
+
+    .menu a.active .icon {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      color: #0a0f1c;
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+    }
+
+    .menu a small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      z-index: 1;
+      position: relative;
+    }
+
+    .menu a:hover small {
+      color: #cbd5e1;
+    }
+
+    main.content {
+      background: var(--card);
+      backdrop-filter: blur(20px);
+      border-radius: var(--radius);
+      padding: var(--content-padding);
+      min-height: calc(100vh - 48px);
+      position: relative;
+      box-shadow: var(--shadow-intense), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: hidden auto;
+      transition: all 0.3s ease;
+    }
+
+    main.content:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-intense), 0 0 50px rgba(6, 182, 212, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .toprow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .breadcrumbs {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .title {
+      font-size: 28px;
+      margin: 8px 0 0;
+      font-weight: 800;
+      background: linear-gradient(135deg, #f1f5f9, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    article {
+      max-width: 1000px;
+    }
+
+    h2,
+    h3,
+    h4 {
+      color: #f1f5f9;
+      margin-top: 32px;
+      font-weight: 700;
+    }
+
+    h3 {
+      font-size: 24px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    h3::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 0;
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+      border-radius: 2px;
+    }
+
+    h4 {
+      font-size: 18px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #cbd5e1;
+      line-height: 1.7;
+    }
+
+    ul,
+    ol {
+      color: #cbd5e1;
+      line-height: 1.7;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    pre {
+      background: linear-gradient(145deg, rgba(2, 8, 23, 0.8), rgba(15, 23, 42, 0.9));
+      padding: 20px;
+      border-radius: 12px;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    pre::before {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 20px 0 0 #f59e0b, 40px 0 0 #10b981;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .actions .kbd {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.7));
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .faq-item {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.5), rgba(30, 41, 59, 0.3));
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .faq-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2), 0 0 30px rgba(6, 182, 212, 0.1);
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    a:hover {
+      color: var(--accent-secondary);
+      text-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+    }
+
+    /* Mobile styles */
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+        padding: 0 16px;
+      }
+
+      nav.sidebar {
+        display: none;
+      }
+
+      .mobile-bar {
+        position: sticky;
+        top: 24px;
+        background: transparent;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        z-index: 40;
+      }
+
+      .mobile-bar .app-title {
+        font-weight: 700;
+        font-size: 18px;
+        color: #f1f5f9;
+      }
+
+      .hambtn {
+        background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #0a0f1c;
+        border: none;
+        font-weight: 700;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+      }
+
+      .hambtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+      }
+
+      .drawer {
+        position: fixed;
+        inset: 0;
+        display: none;
+        z-index: 1000;
+      }
+
+      .drawer.show {
+        display: block;
+      }
+
+      .drawer .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(10px);
+      }
+
+      .drawer .panel {
+        position: absolute;
+        left: 16px;
+        top: 80px;
+        bottom: 16px;
+        width: calc(100% - 32px);
+        max-width: 350px;
+        background: var(--nav-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 24px;
+        overflow: auto;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: var(--shadow-intense);
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        0% {
+          transform: translateX(-100%);
+          opacity: 0;
+        }
+
+        100% {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .drawer .panel .menu {
+        margin-top: 16px;
+      }
+
+      main.content {
+        padding: 24px;
+      }
+
+      .title {
+        font-size: 24px;
+      }
+
+      .toprow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+    }
+
+    /* Focus accessibility */
+    a:focus,
+    button:focus {
+      outline: 3px solid rgba(6, 182, 212, 0.4);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, var(--accent-secondary), var(--accent));
+    }
+
+    /* Smooth reveal animation for sections */
+    section {
+      animation: fadeInUp 0.6s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Enhanced button styling */
+    button {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+  </style>
+
+</head>
+
+<body>
+  <div class="container" role="application">
+
+    <!-- Sidebar -->
+    <nav class="sidebar" aria-label="Documentation navigation">
+      <div class="brand">
+        <div>
+          <h1>PIXI VPN GOLD</h1>
+          <p class="muted">说明文档</p>
+        </div>
+      </div>
+      <div class="menu" id="menu-desktop">
+        <a href="#intro" class="active" data-target="intro"><span class="icon">🏠</span>
+          <div><strong>简介</strong><small class="muted">概述与快速开始</small></div>
+        </a>
+        <a href="#install" data-target="install"><span class="icon">⚙️</span>
+          <div><strong>安装指南</strong><small class="muted">编译与安装</small></div>
+        </a>
+        <a href="#config" data-target="config"><span class="icon">🔧</span>
+          <div><strong>配置指南</strong><small class="muted">上传与设置</small></div>
+        </a>
+        <a href="#usage" data-target="usage"><span class="icon">🚀</span>
+          <div><strong>使用指南</strong><small class="muted">如何使用</small></div>
+        </a>
+        <a href="#faq" data-target="faq"><span class="icon">❓</span>
+          <div><strong>常见问题</strong><small class="muted">常见疑问</small></div>
+        </a>
+        <a href="#changelog" data-target="changelog"><span class="icon">📝</span>
+          <div><strong>更新日志</strong><small class="muted">版本历史</small></div>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content" id="main-content">
+      <div class="mobile-bar" id="mobile-bar" style="display:none;">
+        <div class="app-title">PIXI VPN GOLD</div>
+        <div><button class="hambtn" id="hambtn" aria-controls="mobile-drawer" aria-expanded="false"
+            aria-label="Open menu">☰ 菜单</button></div>
+      </div>
+
+      <article>
+        <div class="toprow">
+          <div>
+            <div class="breadcrumbs">文档 / <span id="crumb">简介</span></div>
+            <h2 class="title" id="page-title">简介</h2>
+
+          </div>
+          <div class="actions">
+            <div class="kbd">使用 <strong>Ctrl + F</strong> 在页面中搜索</div>
+          </div>
+        </div>
+
+        <!-- Sections -->
+        <section id="intro">
+          <p>
+            Pixi VPN Gold 是一款基于最新多协议（OpenVPN, V2ray 和 Wireguard）库构建的 Flutter 应用程序，拥有精美的用户界面。
+          </p>
+
+          <h4>✨ 核心功能</h4>
+          <ul>
+            <li>多协议支持：OpenVPN, V2ray 和 Wireguard</li>
+            <li>支持 Android 15+</li>
+            <li>简洁极简的用户界面</li>
+            <li>快速连接</li>
+            <li>免费与付费节点系统</li>
+            <li>Google 移动广告</li>
+            <li>Google 应用内购买</li>
+            <li>帮助中心</li>
+            <li>用户在线客服</li>
+            <li>用户协议切换</li>
+            <li>用户认证</li>
+          </ul>
+        </section>
+
+        <section id="install" class="hidden">
+          <h3>安装指南</h3>
+
+          <p>在编译 <strong>Pixi VPN</strong> Flutter 应用之前，请确保您的开发环境中正确安装并配置了以下工具：</p>
+
+          <h4>🛠️ 系统要求</h4>
+          <ul>
+            <li>✅ Flutter SDK <strong>3.32.8</strong> (推荐使用最新稳定版)</li>
+            <li>✅ Android Studio (推荐 Narwhal 版本以获得最佳体验)
+            </li>
+            <li>✅ Java JDK <strong>21.0.2</strong> (需正确安装并添加到系统 PATH)</li>
+            <li>✅ Xcode <strong>15.0+</strong> (用于 macOS 上的 iOS 开发)</li>
+            <li>✅ CocoaPods <strong>1.12+</strong> (用于 iOS 依赖)</li>
+          </ul>
+
+          <p>通过运行 Flutter doctor 命令验证您的开发环境：</p>
+          <pre><code>flutter doctor -v</code></pre>
+
+          <h4>⚙️ 编译步骤</h4>
+          <ol>
+            <li>📁 在 <strong>Android Studio</strong> 或您首选的 IDE 中打开项目文件夹</li>
+            <li>📦 运行 <code>flutter pub get</code> 获取所有必需的依赖项</li>
+            <li>🧹 清理项目：<code>flutter clean</code></li>
+            <li>🔧 iOS 平台：<code>cd ios && pod install</code></li>
+            <li>📱 连接您的设备或启动模拟器</li>
+            <li>▶️ 点击绿色的 <strong>Run</strong> 按钮或使用 <code>flutter run</code></li>
+          </ol>
+
+          <p>🎉 编译完成后，Pixi VPN 应用程序将在您选择的设备上启动，所有功能即可直接使用。</p>
+        </section>
+
+        <section id="config" class="hidden">
+          <h3>配置指南</h3>
+
+          <p>本综合指南将指导您将基于 Laravel 的管理后台部署到 <strong>cPanel</strong> 共享主机环境。每一步都详细说明，以确保部署顺利成功。</p>
+
+          <h4>🌐 1. 域名与子域名设置</h4>
+          <p>
+            首先，确定您的托管策略。您可以使用主域名（例如
+            <code>vpnadmin.com</code>）或创建专用的子域名（例如 <code>admin.vpnapp.com</code>）。
+          </p>
+          <p>创建子域名：</p>
+          <ol>
+            <li>导航到 cPanel 的 <strong>Subdomains</strong>（子域名）部分</li>
+            <li>输入您想要的子域名名称</li>
+            <li>选择主域名</li>
+            <li>点击 <strong>Create</strong>（创建）</li>
+          </ol>
+
+          <h4>📂 2. 上传 Laravel 项目</h4>
+          <p>
+            访问 cPanel 中的 <strong>File Manager</strong>（文件管理器）并导航到您的域名根目录：
+          </p>
+          <ul>
+            <li>主域名：<code>public_html/</code></li>
+            <li>子域名：<code>public_html/subdomain_name/</code></li>
+          </ul>
+          <ol>
+            <li>📤 点击 <strong>Upload</strong>（上传）并选择您的 Laravel 项目 ZIP 文件</li>
+            <li>⏳ 等待上传完成</li>
+            <li>📦 右键单击 ZIP 文件并选择 <strong>Extract</strong>（解压）</li>
+            <li>🗂️ 如果需要，将解压后的文件移动到根目录</li>
+          </ol>
+
+          <h4>🗄️ 3. MySQL 数据库配置</h4>
+          <p>导航到 cPanel 中的 <strong>MySQL® Databases</strong>：</p>
+          <ol>
+            <li>🔧 <strong>创建数据库：</strong> 输入名称，如 <code>vpn_admin_db</code></li>
+            <li>👤 <strong>创建用户：</strong> 添加一个新的数据库用户并设置强密码</li>
+            <li>🔐 <strong>赋予权限：</strong> 将用户添加到数据库并授予 <strong>All Privileges</strong>（所有权限）
+            </li>
+            <li>✅ 检查数据库列表确认设置</li>
+          </ol>
+
+          <h4>📥 4. 数据库导入流程</h4>
+          <p>
+            从 cPanel 打开 <strong>phpMyAdmin</strong> 并按照以下步骤操作：
+          </p>
+          <ol>
+            <li>🎯 从左侧边栏选择您刚创建的数据库</li>
+            <li>📥 点击顶部菜单中的 <strong>Import</strong>（导入）选项卡</li>
+            <li>📄 选择 <code>database.sql</code> 文件（包含在项目包中）</li>
+            <li>⚡ 点击 <strong>Go</strong> 开始导入流程</li>
+            <li>✅ 验证所有表是否已成功导入</li>
+          </ol>
+
+          <h4>🔧 5. 环境配置</h4>
+          <p>
+            在 Laravel 根目录中找到并编辑 <code>.env</code> 文件：
+          </p>
+          <pre><code>APP_NAME="Pixi VPN Admin"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_secure_password
+
+# Additional security settings
+SESSION_LIFETIME=120
+SESSION_SECURE_COOKIE=true</code></pre>
+          <p>
+            🔒 <strong>重要：</strong> 确保 <code>APP_URL</code> 与您的域名或子域名 URL 完全匹配。
+          </p>
+
+          <h4>🌟 6. 最终部署步骤</h4>
+          <ol>
+            <li>🌐 在浏览器中访问您的域名/子域名</li>
+            <li>🔍 检查是否有错误消息并解决它们</li>
+            <li>✅ 验证管理后台是否正确加载</li>
+            <li>🔐 测试登录功能</li>
+          </ol>
+
+
+        </section>
+
+        <section id="usage" class="hidden">
+          <h3>使用指南</h3>
+          <p>通过这份涵盖所有核心功能和操作的综合使用指南，掌握管理后台和 VPN 移动应用的使用，确保正确使用所有功能。</p>
+
+          <h4>🔐 1. 管理后台访问</h4>
+          <p>
+            在任何现代浏览器中访问您的管理后台 URL。使用以下演示凭据开始：
+          </p>
+          <div class="faq-item">
+            <p><strong>📧 邮箱：</strong> <code>admin@gmail.com</code></p>
+            <p><strong>🔑 密码：</strong> <code>123456</code></p>
+            <p><small>💡 <em>提示： 为了安全起见，请在首次登录后立即更改这些凭据</em></small></p>
+          </div>
+          <p>您可以从管理仪表板的个人资料部分更新登录凭据、个人信息和安全设置。</p>
+
+          <h4>💰 3. AdMob 集成设置</h4>
+          <p>通过 Google AdMob 集成为您的应用变现：</p>
+
+          <h5>📱 A. Android 配置</h5>
+          <p>
+            导航到您的 Flutter 项目并编辑：
+            <code>android/app/src/main/AndroidManifest.xml</code>
+          </p>
+          <p>在 <code>&lt;application&gt;</code> 标签内添加您的 AdMob App ID：</p>
+          <pre><code>&lt;application&gt;
+    ...
+    &lt;meta-data
+        android:name="com.google.android.gms.ads.APPLICATION_ID"
+        android:value="ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy"/&gt;
+    ...
+&lt;/application&gt;</code></pre>
+
+          <h5>🎯 B. 广告单元管理</h5>
+          <p>通过管理后台的 <strong>Advertisement</strong>（广告）部分配置您的广告单元：</p>
+          <ul>
+            <li>🏷️ <strong>Banner 广告：</strong> 显示在屏幕顶部/底部</li>
+            <li>📺 <strong>插屏广告：</strong> 动作之间的全屏广告</li>
+            <li>🎁 <strong>激励广告：</strong> 用户观看以获取高级功能</li>
+            <li>🎯 <strong>原生广告：</strong> 无缝集成的广告内容</li>
+          </ul>
+
+          <h4>🔗 4. 应用与后台连接</h4>
+          <p>
+            将您的 Flutter 应用与管理后台后端连接：
+          </p>
+          <ol>
+            <li>📂 在 <strong>Android Studio</strong> 中打开您的 Flutter 项目</li>
+            <li>🧭 导航至：<code>lib/utils/app_string.dart</code></li>
+            <li>🔍 找到基础 URL 配置：</li>
+            <pre><code>class AppString {
+  static const String baseUrl = "https://vpn-admin.pixiumlab.com";
+}</code></pre>
+            <li>✏️ 替换为您的管理后台域名：</li>
+            <pre><code>class AppString {
+  static const String baseUrl = "https://yourdomain.com";
+}</code></pre>
+            <li>💾 保存文件</li>
+            <li>🔄 重新构建应用：<code>flutter clean && flutter pub get</code></li>
+          </ol>
+
+          <h4>💳 5. 应用内购买配置</h4>
+          <p>设置高级功能的订阅计划：</p>
+          <ol>
+            <li>🏪 在 Google Play 控制台中配置商品</li>
+            <li>💰 设置订阅价格和计费周期</li>
+            <li>⚙️ 在源码根目录 <code>lib > in app purchase</code> 中更新产品 ID</li>
+            <li>🧪 使用测试帐户测试购买</li>
+          </ol>
+
+
+        </section>
+
+        <section id="faq" class="hidden">
+          <h3>常见问题解答</h3>
+          <p>查找 Pixi VPN 开发和部署的常见问题解答和故障排除方案。如有更多疑问，请随时通过邮箱联系我们：pixiumlab@gmail.com</p>
+
+          <div class="faq-item">
+            <h4>❓ 哪里可以获取用于测试的免费 VPN 服务器？</h4>
+            <p>多个可靠来源提供适合开发和测试的免费 VPN 服务器：</p>
+
+          </div>
+
+          <div class="faq-item">
+            <h4>❓ 如何搭建自己的 VPN 服务器？</h4>
+            <p>搭建自己的 VPN 基础设施可以让您完全控制性能和安全性：</p>
+
+            <h5>🖥️ VPS 要求：</h5>
+            <ul>
+              <li>💾 <strong>内存：</strong> 最小 1GB（推荐 2GB）</li>
+              <li>💽 <strong>存储：</strong> 最小 10GB SSD</li>
+              <li>🌐 <strong>带宽：</strong> 无限制或高流量限制</li>
+              <li>📍 <strong>位置：</strong> 多个区域以获得更好的覆盖范围</li>
+            </ul>
+
+            <p>💰 <strong>成本细分：</strong> 根据位置和规格，预计每台服务器每月 4-20 美元。</p>
+          </div>
+
+          <div class="faq-item">
+            <h4>❓ Pixi VPN 的盈利策略有哪些？</h4>
+            <p>多种收入来源可以使您的 VPN 应用盈利：</p>
+
+            <h5>📺 AdMob 广告收入：</h5>
+            <ul>
+              <li>🏷️ <strong>Banner 广告：</strong> 每 1000 次展示 0.50-2.00 美元</li>
+              <li>📱 <strong>插屏广告：</strong> 每 1000 次展示 1.00-5.00 美元</li>
+              <li>🎁 <strong>激励广告：</strong> 每 1000 次观看 2.00-8.00 美元</li>
+            </ul>
+
+            <h5>💎 高级订阅计划：</h5>
+            <ul>
+              <li>📱 <strong>月付：</strong> 4.99-9.99 美元/月</li>
+              <li>📅 <strong>年付：</strong> 29.99-59.99 美元/年（更超值）</li>
+              <li>👨‍👩‍👧‍👦 <strong>家庭计划：</strong> 9.99-19.99 美元/月</li>
+            </ul>
+
+
+          </div>
+
+
+        </section>
+
+        <section id="changelog" class="hidden">
+          <h3>更新日志与版本历史</h3>
+          <p>通过详细的版本更新、新功能和改进来跟踪 Pixi VPN 的演变：</p>
+
+
+          <div class="faq-item">
+            <h4>📈 版本 1.0.0 - 正式发布</h4>
+            <p><strong>发布日期：</strong> 2025年11月12日</p>
+            <ul>
+              <li>🌐 <strong>首次发布</strong> — 多协议 VPN 应用 </li>
+
+            </ul>
+          </div>
+
+
+
+
+          <p>💡 <strong>开发者说明：</strong> 每个版本都在多个设备和操作系统版本上进行了全面测试，以确保可靠性和性能。</p>
+        </section>
+
+      </article>
+    </main>
+  </div>
+
+  <div class="drawer" id="mobile-drawer" aria-hidden="true">
+    <div class="overlay" id="drawer-overlay"></div>
+    <div class="panel" role="dialog" aria-label="Navigation drawer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <strong style="color: #f1f5f9;">导航</strong>
+        <button id="close-drawer" aria-label="Close menu"
+          style="background:transparent;border:none;color:var(--muted);font-size:18px;">✕</button>
+      </div>
+      <div class="menu" id="menu-mobile"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      let allLinks;
+      const main = document.getElementById('main-content');
+      const title = document.getElementById('page-title');
+      const crumb = document.getElementById('crumb');
+      const sections = document.querySelectorAll('main.content article section');
+
+      function setActive(targetId) {
+        allLinks.forEach(a => a.classList.toggle('active', a.dataset.target === targetId));
+        sections.forEach(section => section.classList.add('hidden'));
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.classList.remove('hidden');
+          const newTitle = el.querySelector('h3') ? el.querySelector('h3').innerText : '简介';
+          title.textContent = newTitle;
+          crumb.textContent = newTitle;
+
+          // Add smooth reveal animation
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(20px)';
+          setTimeout(() => {
+            el.style.transition = 'all 0.4s ease-out';
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+          }, 50);
+        }
+        main.scrollTop = 0;
+      }
+
+      const hambtn = document.getElementById('hambtn');
+      const drawer = document.getElementById('mobile-drawer');
+      const overlay = document.getElementById('drawer-overlay');
+      const closeBtn = document.getElementById('close-drawer');
+      const menuMobile = document.getElementById('menu-mobile');
+
+      function openDrawer() {
+        drawer.classList.add('show');
+        drawer.setAttribute('aria-hidden', 'false');
+        hambtn.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('show');
+        drawer.setAttribute('aria-hidden', 'true');
+        hambtn.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+      }
+
+      if (hambtn) {
+        hambtn.addEventListener('click', () => { openDrawer(); });
+      }
+      overlay.addEventListener('click', closeDrawer);
+      closeBtn.addEventListener('click', closeDrawer);
+
+      function initializeMenu() {
+        const desktopMenu = document.getElementById('menu-desktop');
+        if (desktopMenu && menuMobile) {
+          menuMobile.innerHTML = '';
+          const desktopLinks = desktopMenu.querySelectorAll('a');
+          desktopLinks.forEach(link => {
+            const clonedLink = link.cloneNode(true);
+            clonedLink.addEventListener('click', e => {
+              e.preventDefault();
+              const t = e.currentTarget.dataset.target;
+              setActive(t);
+              closeDrawer();
+            });
+            menuMobile.appendChild(clonedLink);
+          });
+        }
+
+        allLinks = Array.from(document.querySelectorAll('.menu a'));
+        const desktopLinks = document.querySelectorAll('#menu-desktop a');
+        desktopLinks.forEach(a => {
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            const t = a.dataset.target;
+            setActive(t);
+          });
+        });
+      }
+
+      const mobileBar = document.getElementById('mobile-bar');
+      function checkSize() {
+        if (window.innerWidth <= 900) {
+          mobileBar.style.display = 'flex';
+        } else {
+          mobileBar.style.display = 'none';
+          closeDrawer();
+        }
+      }
+
+      // Smooth scrolling for internal navigation
+      function smoothScrollToTop() {
+        const start = main.scrollTop;
+        const startTime = performance.now();
+        const duration = 300;
+
+        function scroll(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const easing = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+
+          main.scrollTop = start * (1 - easing);
+
+          if (progress < 1) {
+            requestAnimationFrame(scroll);
+          }
+        }
+
+        requestAnimationFrame(scroll);
+      }
+
+      // Enhanced keyboard navigation
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeDrawer();
+        }
+        if (e.ctrlKey && e.key === 'k') {
+          e.preventDefault();
+          // Focus on search or first menu item
+          const firstLink = document.querySelector('.menu a');
+          if (firstLink) firstLink.focus();
+        }
+      });
+
+      // Initialize
+      window.addEventListener('resize', checkSize);
+      checkSize();
+      initializeMenu();
+      setActive('intro');
+
+      // Add intersection observer for active section highlighting
+      const observerOptions = {
+        root: main,
+        rootMargin: '-20% 0px -70% 0px',
+        threshold: 0
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            if (id && allLinks) {
+              allLinks.forEach(link => {
+                link.classList.toggle('active', link.dataset.target === id);
+              });
+            }
+          }
+        });
+      }, observerOptions);
+
+      // Observe all sections
+      sections.forEach(section => observer.observe(section));
+
+      // Add loading animation
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.style.opacity = '0';
+        document.body.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          document.body.style.transition = 'all 0.6s ease-out';
+          document.body.style.opacity = '1';
+          document.body.style.transform = 'translateY(0)';
+        }, 100);
+      });
+    })();
+  </script>
+</body>
+
+</html>
