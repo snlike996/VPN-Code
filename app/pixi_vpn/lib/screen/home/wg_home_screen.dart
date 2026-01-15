@@ -809,7 +809,7 @@ class _VPNHomePageState extends State<WGHomeScreen>
 
               ListTile(
                 leading: Icon(Icons.vpn_key),
-                title: Text('协议'),
+                title: Text('选择协议'),
                 onTap: () {
                   Get.to(()=> SelectProtocolScreen(),transition: Transition.fadeIn);
                 },
@@ -980,7 +980,7 @@ class _VPNHomePageState extends State<WGHomeScreen>
             _advancedDrawerController.showDrawer();
           }, icon: Icon(Icons.menu)),
           title: Text(
-            'TS VPN - WireGuard',
+            'TSVPN - WireGuard',
             style: GoogleFonts.openSans(
               fontSize: 19,
               fontWeight: FontWeight.w700,

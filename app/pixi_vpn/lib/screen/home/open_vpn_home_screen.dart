@@ -498,7 +498,7 @@ class _OpenVpnHomeScreenState extends State<OpenVpnHomeScreen>
 
               ListTile(
                 leading: Icon(Icons.vpn_key),
-                title: Text('协议'),
+                title: Text('选择协议'),
                 onTap: () {
                   Get.to(()=> SelectProtocolScreen(),transition: Transition.fadeIn);
                 },
@@ -669,7 +669,7 @@ class _OpenVpnHomeScreenState extends State<OpenVpnHomeScreen>
             _advancedDrawerController.showDrawer();
           }, icon: Icon(Icons.menu)),
           title: Text(
-            'TS VPN - OpenVPN',
+            'TSVPN - OpenVPN',
             style: GoogleFonts.openSans(
               fontSize: 19,
               fontWeight: FontWeight.w700,

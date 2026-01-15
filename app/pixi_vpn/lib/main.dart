@@ -39,7 +39,7 @@ class V2rayGuard extends StatelessWidget {
 
     return GetMaterialApp(
       navigatorObservers: observers,
-      title: 'TS VPN',
+      title: 'TSVPN',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -54,4 +54,3 @@ class V2rayGuard extends StatelessWidget {
     );
   }
 }
-

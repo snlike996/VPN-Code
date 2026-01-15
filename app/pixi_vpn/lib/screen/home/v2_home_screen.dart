@@ -504,7 +504,7 @@ class _VPNHomePageState extends State<V2HomeScreen>
 
               ListTile(
                 leading: Icon(Icons.vpn_key),
-                title: Text('协议'),
+                title: Text('选择协议'),
                 onTap: () {
                   Get.to(()=> SelectProtocolScreen(),transition: Transition.fadeIn);
                 },
@@ -684,7 +684,7 @@ class _VPNHomePageState extends State<V2HomeScreen>
             _advancedDrawerController.showDrawer();
           }, icon: Icon(Icons.menu)),
           title: Text(
-            'TS VPN - V2ray',
+            'TSVPN - V2ray',
             style: GoogleFonts.openSans(
               fontSize: 16,
               fontWeight: FontWeight.w700,
