@@ -92,7 +92,13 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows (x64)
-        run: flutter build windows --release --build-dir build/windows/x64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+        run: flutter build windows --release --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+
+      - name: Stage x64 output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
+          Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/x64/runner/Release -Recurse -Force
 
       - name: Detect arm64 support
         shell: pwsh
@@ -108,7 +114,16 @@ jobs:
         id: build_arm64
         if: env.ARM64_SUPPORTED == 'true'
         continue-on-error: true
-        run: flutter build windows --release --target-platform=windows-arm64 --build-dir build/windows/arm64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+        run: flutter build windows --release --target-platform=windows-arm64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+
+      - name: Stage arm64 output
+        if: env.ARM64_SUPPORTED == 'true'
+        shell: pwsh
+        run: |
+          if ("${{ steps.build_arm64.outcome }}" -eq "success") {
+            New-Item -ItemType Directory -Force -Path build/windows/arm64/runner/Release | Out-Null
+            Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/arm64/runner/Release -Recurse -Force
+          }
 
       - name: Set arm64 flag
         shell: pwsh
