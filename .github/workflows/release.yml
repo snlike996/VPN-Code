@@ -92,10 +92,21 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows (x64)
-        run: flutter build windows --release --target-platform=windows-x64 --build-dir build/windows/x64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+        run: flutter build windows --release --build-dir build/windows/x64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+
+      - name: Detect arm64 support
+        shell: pwsh
+        run: |
+          $help = flutter build windows -h | Out-String
+          if ($help -match "target-platform") {
+            "ARM64_SUPPORTED=true" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            "ARM64_SUPPORTED=false" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
 
       - name: Build Windows (arm64)
         id: build_arm64
+        if: env.ARM64_SUPPORTED == 'true'
         continue-on-error: true
         run: flutter build windows --release --target-platform=windows-arm64 --build-dir build/windows/arm64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
 
