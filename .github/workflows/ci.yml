@@ -74,8 +74,31 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release --verbose
 
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($path in $candidates) {
+            if (Test-Path $path) {
+              $found = $path
+              break
+            }
+          }
+          if ($null -eq $found) {
+            Write-Error "Windows build output not found after build!"
+            Get-ChildItem build/windows -Recurse -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Get-ChildItem $found
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe-ci
-          path: app/pixi_vpn/build/windows/runner/Release/*.exe
+          path: |
+            app/pixi_vpn/build/windows/x64/runner/Release/*.exe
+            app/pixi_vpn/build/windows/runner/Release/*.exe

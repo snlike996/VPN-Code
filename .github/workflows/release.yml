@@ -107,18 +107,31 @@ jobs:
         working-directory: app/pixi_vpn
         shell: pwsh
         run: |
-          if (!(Test-Path "build/windows/runner/Release")) {
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($path in $candidates) {
+            if (Test-Path $path) {
+              $found = $path
+              break
+            }
+          }
+          if ($null -eq $found) {
             Write-Error "Windows build output not found after build!"
+            Get-ChildItem build/windows -Recurse -ErrorAction SilentlyContinue
             exit 1
           }
-          Get-ChildItem build/windows/runner/Release
+          Get-ChildItem $found
+          "WIN_RELEASE_DIR=$found" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Prepare x64 artifact
         working-directory: app/pixi_vpn
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
-          Copy-Item -Path build/windows/runner/Release/* `
+          Copy-Item -Path "$env:WIN_RELEASE_DIR/*" `
             -Destination build/windows/x64/runner/Release `
             -Recurse -Force
 
@@ -138,7 +151,7 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:RELEASE_VERSION
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=build\windows\x64\runner\Release /DAppExeName=pixi_vpn.exe
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=pixi_vpn.exe
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -146,6 +159,7 @@ jobs:
           name: windows-release
           path: |
             app/pixi_vpn/build/windows/x64/runner/Release/**
+            app/pixi_vpn/build/windows/runner/Release/**
             app/pixi_vpn/artifacts/*.zip
             app/pixi_vpn/installer/windows/output/*.exe
 
