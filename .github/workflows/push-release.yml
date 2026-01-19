@@ -1,0 +1,215 @@
+name: Push Release
+
+on:
+  push:
+    branches: ["main", "master"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: push-release
+  cancel-in-progress: true
+
+jobs:
+  build_android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/pixi_vpn
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.logging.stacktrace=full"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: "3.32.8"
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APKs (release, split per ABI)
+        run: flutter build apk --release --split-per-abi --verbose
+
+      - name: Rename APKs
+        run: |
+          cd build/app/outputs/flutter-apk
+          mv app-arm64-v8a-release.apk TSVPN-arm64-v8a.apk || true
+          mv app-armeabi-v7a-release.apk TSVPN-armeabi-v7a.apk || true
+          mv app-x86_64-release.apk TSVPN-x86_64.apk || true
+
+      - name: Stage Android artifacts
+        run: |
+          mkdir -p build/ci/android
+          for f in build/app/outputs/flutter-apk/TSVPN-*.apk; do
+            if [ -f "$f" ]; then
+              cp "$f" build/ci/android/
+            fi
+          done
+          ls -la build/ci/android
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: app/pixi_vpn/build/ci/android/*.apk
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.32.8"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Verify windows directory exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "app/pixi_vpn/windows")) {
+            Write-Error "windows/ directory not found. Run flutter create . locally and commit it."
+            exit 1
+          }
+
+      - name: Flutter pub get
+        working-directory: app/pixi_vpn
+        run: flutter pub get
+
+      - name: Build Windows exe
+        working-directory: app/pixi_vpn
+        run: flutter build windows --release --verbose
+
+      - name: Verify build output
+        working-directory: app/pixi_vpn
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($path in $candidates) {
+            if (Test-Path $path) {
+              $found = $path
+              break
+            }
+          }
+          if ($null -eq $found) {
+            Write-Error "Windows build output not found after build!"
+            Get-ChildItem build/windows -Recurse -ErrorAction SilentlyContinue
+            exit 1
+          }
+          $resolved = Resolve-Path -LiteralPath $found
+          Get-ChildItem $resolved.Path
+          "WIN_RELEASE_DIR=$($resolved.Path)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Stage TSVPN.exe
+        working-directory: app/pixi_vpn
+        shell: pwsh
+        run: |
+          $targetPath = "build/ci/windows"
+          New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
+          $exePath = Join-Path $env:WIN_RELEASE_DIR "pixi_vpn.exe"
+          if (!(Test-Path $exePath)) {
+            $exePath = (Get-ChildItem $env:WIN_RELEASE_DIR -Filter *.exe | Select-Object -First 1).FullName
+          }
+          if ([string]::IsNullOrWhiteSpace($exePath)) {
+            Write-Error "No Windows exe found in $env:WIN_RELEASE_DIR"
+            exit 1
+          }
+          Copy-Item -Path $exePath -Destination "$targetPath/TSVPN.exe" -Force
+
+      - name: Build installer (x64)
+        working-directory: app/pixi_vpn
+        shell: pwsh
+        run: |
+          if (!(Test-Path "installer/windows/tsvpn.iss")) {
+            Write-Host "Installer script missing, skipping."
+            exit 0
+          }
+          choco install innosetup -y
+          $version = "0.0.0.$env:GITHUB_RUN_NUMBER"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=pixi_vpn.exe
+          if (Test-Path "installer/output") {
+            Copy-Item -Path installer/output/*.exe -Destination build/ci/windows/ -Force
+          }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: app/pixi_vpn/build/ci/windows/*.exe
+
+  publish_release:
+    runs-on: ubuntu-latest
+    needs: [build_android, build_windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Prepare release notes
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          AUTHOR=$(git log -1 --pretty=%an)
+          TIME=$(git log -1 --pretty=%cI)
+          cat <<EOF > release_notes.md
+          ## 📦 自动构建
+          - Commit: ${SHORT_SHA}
+          - Message: ${COMMIT_MSG}
+          - Author: ${AUTHOR}
+          - Time: ${TIME}
+          EOF
+
+      - name: Delete existing latest release (if any)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest -y --cleanup-tag || true
+
+      - name: Create latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=()
+          for f in dist/android-release/*.apk dist/windows-release/*.exe; do
+            if [ -f "$f" ]; then
+              files+=("$f")
+            fi
+          done
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release assets found." >&2
+            exit 1
+          fi
+          gh release create latest \
+            "${files[@]}" \
+            --title "Latest Build" \
+            --notes-file release_notes.md \
+            --latest

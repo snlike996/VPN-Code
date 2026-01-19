@@ -4,11 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:pixi_vpn/screen/splash/splash_screen.dart';
+import 'package:pixi_vpn/ui/shared/splash/splash_screen.dart';
 import 'di_container.dart' as di;
+import 'main_windows.dart' as windows;
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
+  if (GetPlatform.isWindows) {
+    await windows.bootstrap();
+    return;
+  }
   if (GetPlatform.isAndroid || GetPlatform.isIOS) {
     MobileAds.instance.initialize();
   }

@@ -2,7 +2,10 @@
 
 #include <optional>
 
+#include <wininet.h>
+
 #include "flutter/generated_plugin_registrant.h"
+#include "utils.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,10 +28,49 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+
+  method_channel_ = std::make_unique<
+      flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "tsvpn/windows",
+      &flutter::StandardMethodCodec::GetInstance());
+
+  method_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() == "refreshInternetSettings") {
+          InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr,
+                            0);
+          InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+          result->Success(true);
+          return;
+        }
+        if (call.method_name() == "getStartupArgs") {
+          auto args = GetCommandLineArguments();
+          flutter::EncodableList list;
+          for (const auto& arg : args) {
+            list.emplace_back(arg);
+          }
+          result->Success(list);
+          return;
+        }
+        result->NotImplemented();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+  bool silent_start = false;
+  const auto args = GetCommandLineArguments();
+  for (const auto& arg : args) {
+    if (arg == "--silent" || arg == "--autoconnect") {
+      silent_start = true;
+      break;
+    }
+  }
+
+  flutter_controller_->engine()->SetNextFrameCallback([&, silent_start]() {
+    if (!silent_start) {
+      this->Show();
+    }
   });
 
   // Flutter can complete the first frame before the "show window" callback is

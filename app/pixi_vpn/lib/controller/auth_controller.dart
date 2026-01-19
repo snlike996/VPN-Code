@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:pixi_vpn/screen/home/v2_home_screen.dart';
-import 'package:pixi_vpn/screen/auth/signin_screen.dart';
+import 'package:pixi_vpn/ui/shared/home/v2_home_screen.dart';
+import 'package:pixi_vpn/ui/shared/auth/signin_screen.dart';
 import '../data/datasource/remote/dio/dio_client.dart';
 import '../data/model/base_model/api_response.dart';
 import '../data/repository/auth_repo.dart';
-import '../screen/auth/reset_password_screen.dart';
+import '../ui/shared/auth/reset_password_screen.dart';
 
 class AuthController extends GetxController {
   final DioClient dioClient;
