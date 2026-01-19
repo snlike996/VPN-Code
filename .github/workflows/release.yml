@@ -65,12 +65,29 @@ jobs:
 
   build_windows_release:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: app/pixi_vpn
+    concurrency:
+      group: windows-release-${{ github.ref }}
+      cancel-in-progress: true
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.32.8"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Verify windows directory exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "app/pixi_vpn/windows")) {
+            Write-Error "windows/ directory not found. Run flutter create . locally and commit it."
+            exit 1
+          }
 
       - name: Set release version
         shell: pwsh
@@ -78,93 +95,57 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: "3.32.8"
-          cache: true
-
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
-
       - name: Flutter pub get
+        working-directory: app/pixi_vpn
         run: flutter pub get
 
-      - name: Build Windows (x64)
-        run: flutter build windows --release --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
+      - name: Build Windows exe
+        working-directory: app/pixi_vpn
+        run: flutter build windows --release --verbose
 
-      - name: Stage x64 output
+      - name: Verify build output
+        working-directory: app/pixi_vpn
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/windows/runner/Release")) {
+            Write-Error "Windows build output not found after build!"
+            exit 1
+          }
+          Get-ChildItem build/windows/runner/Release
+
+      - name: Prepare x64 artifact
+        working-directory: app/pixi_vpn
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
-          Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/x64/runner/Release -Recurse -Force
+          Copy-Item -Path build/windows/runner/Release/* `
+            -Destination build/windows/x64/runner/Release `
+            -Recurse -Force
 
-      - name: Detect arm64 support
-        shell: pwsh
-        run: |
-          $help = flutter build windows -h | Out-String
-          if ($help -match "target-platform") {
-            "ARM64_SUPPORTED=true" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            "ARM64_SUPPORTED=false" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-
-      - name: Build Windows (arm64)
-        id: build_arm64
-        if: env.ARM64_SUPPORTED == 'true'
-        continue-on-error: true
-        run: flutter build windows --release --target-platform=windows-arm64 --build-name "$env:RELEASE_VERSION" --build-number "$env:GITHUB_RUN_NUMBER" --verbose
-
-      - name: Stage arm64 output
-        if: env.ARM64_SUPPORTED == 'true'
-        shell: pwsh
-        run: |
-          if ("${{ steps.build_arm64.outcome }}" -eq "success") {
-            New-Item -ItemType Directory -Force -Path build/windows/arm64/runner/Release | Out-Null
-            Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/arm64/runner/Release -Recurse -Force
-          }
-
-      - name: Set arm64 flag
-        shell: pwsh
-        run: |
-          if ("${{ steps.build_arm64.outcome }}" -eq "success") {
-            "ARM64_BUILT=true" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            "ARM64_BUILT=false" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-
-      - name: Prepare portable zips
+      - name: Prepare portable zip
+        working-directory: app/pixi_vpn
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           $version = $env:RELEASE_VERSION
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "artifacts/TSVPN-Windows-$version-x64.zip" -Force
-          if ($env:ARM64_BUILT -eq "true") {
-            Compress-Archive -Path build/windows/arm64/runner/Release/* -DestinationPath "artifacts/TSVPN-Windows-$version-arm64.zip" -Force
-          }
 
       - name: Install Inno Setup
         run: choco install innosetup -y
 
       - name: Build installer (x64)
+        working-directory: app/pixi_vpn
         shell: pwsh
         run: |
           $version = $env:RELEASE_VERSION
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=build\windows\x64\runner\Release /DAppExeName=pixi_vpn.exe
-
-      - name: Build installer (arm64)
-        if: env.ARM64_BUILT == 'true'
-        shell: pwsh
-        run: |
-          $version = $env:RELEASE_VERSION
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=arm64 /DBuildDir=build\windows\arm64\runner\Release /DAppExeName=pixi_vpn.exe
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
           path: |
+            app/pixi_vpn/build/windows/x64/runner/Release/**
             app/pixi_vpn/artifacts/*.zip
             app/pixi_vpn/installer/windows/output/*.exe
 
