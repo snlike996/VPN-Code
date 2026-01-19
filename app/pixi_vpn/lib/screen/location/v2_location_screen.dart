@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:pixi_vpn/controller/v2ray_vpn_controller.dart';
+import 'package:pixi_vpn/model/v2ray_vpn_model.dart';
 import 'package:pixi_vpn/screen/auth/signin_screen.dart';
 import 'package:pixi_vpn/screen/home/v2_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -212,7 +213,10 @@ class _V2LocationScreenState extends State<V2LocationScreen> {
         }
       }
 
-      Get.find<V2rayVpnController>().getV2rayVpnData();
+      Get.find<V2rayVpnController>().getV2rayVpnData().then((_) {
+        // Start ping tests after servers are loaded
+        Get.find<V2rayVpnController>().testAllServersPing();
+      });
       checkAuthAndFetchProfile();
     });
   }
@@ -441,7 +445,7 @@ class _V2LocationScreenState extends State<V2LocationScreen> {
 
                                                             // ---- DESCRIPTION ----
                                                             Text(
-                                                              "观看广告以连接我们的高级服务器，或升级为高级会员以获得无限制的安全访问。",
+                                                              "填写支付宝口令红包开通高级会员，获得无限制的安全访问。",
                                                               style: GoogleFonts.poppins(
                                                                 color: Colors.black.withValues(alpha: 0.72),
                                                                 fontSize: 14,
@@ -474,7 +478,7 @@ class _V2LocationScreenState extends State<V2LocationScreen> {
                                                                       ),
                                                                     ),
                                                                     child: Text(
-                                                                      "购买高级版",
+                                                                      "填写口令红包",
                                                                       style: GoogleFonts.poppins(
                                                                         fontSize: 16,
                                                                         fontWeight: FontWeight.w500,
@@ -554,9 +558,19 @@ class _V2LocationScreenState extends State<V2LocationScreen> {
                                                   ),
                                                 ],
                                               ),
-                                              trailing: isLocked
-                                                ? Image.asset('assets/images/crown.png', height: 30, width: 30)
-                                                  : const Icon(Icons.chevron_right, color: Colors.grey),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  // Ping indicator
+                                                  _buildPingIndicator(item),
+                                                  const SizedBox(width: 8),
+                                                  // Lock or arrow icon
+                                                  if (isLocked)
+                                                    Image.asset('assets/images/crown.png', height: 30, width: 30)
+                                                  else
+                                                    const Icon(Icons.chevron_right, color: Colors.grey),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -582,5 +596,50 @@ class _V2LocationScreenState extends State<V2LocationScreen> {
     );
   }
 
+  /// Build ping indicator widget
+  Widget _buildPingIndicator(V2rayVpnModel server) {
+    if (server.isPinging) {
+      // Show loading indicator while pinging
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+        ),
+      );
+    }
+
+    if (server.ping == null) {
+      // No ping data or timeout
+      return Text(
+        '-',
+        style: GoogleFonts.poppins(
+          color: Colors.grey,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
+    // Determine color based on ping value
+    Color pingColor;
+    if (server.ping! < 100) {
+      pingColor = Colors.green; // Good
+    } else if (server.ping! < 300) {
+      pingColor = Colors.orange; // Medium
+    } else {
+      pingColor = Colors.red; // Poor
+    }
+
+    return Text(
+      '${server.ping}ms',
+      style: GoogleFonts.poppins(
+        color: pingColor,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
 
 }

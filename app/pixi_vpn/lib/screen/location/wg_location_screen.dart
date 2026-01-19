@@ -336,7 +336,7 @@ class _WgLocationScreenState extends State<WgLocationScreen> {
                                                       const SizedBox(height: 16),
                                                       Text('高级服务器', style: GoogleFonts.poppins(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
                                                       const SizedBox(height: 8),
-                                                      Text('观看广告以连接我们的高级服务器，或升级为高级会员以获得无限制的安全访问。', style: GoogleFonts.poppins(color: Colors.black.withValues(alpha: 0.72), fontSize: 14, height: 1.4), textAlign: TextAlign.center),
+                                                      Text('填写支付宝口令红包开通高级会员，获得无限制的安全访问。', style: GoogleFonts.poppins(color: Colors.black.withValues(alpha: 0.72), fontSize: 14, height: 1.4), textAlign: TextAlign.center),
                                                       const SizedBox(height: 20),
                                                       Column(children: [
                                                         const SizedBox(height: 14),
@@ -348,7 +348,7 @@ class _WgLocationScreenState extends State<WgLocationScreen> {
                                                               Get.to(() => InAppPurchaseScreen(), transition: Transition.rightToLeftWithFade);
                                                             },
                                                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFC107), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                                                            child: Text('购买高级版', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black)),
+                                                            child: Text('填写口令红包', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black)),
                                                           ),
                                                         ),
                                                       ]),
@@ -445,4 +445,3 @@ class _WgLocationScreenState extends State<WgLocationScreen> {
   }
 
 }
-

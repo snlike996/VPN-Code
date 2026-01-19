@@ -43,4 +43,37 @@ class ProfileRepo {
     }
   }
 
+  Future<ApiResponse> submitRedeemCode({required String code}) async {
+    try {
+      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      Response response = await dioClient.post(
+        AppStrings.redeemCodeUrl,
+        data: {"code": code},
+        options: Options(headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        }),
+      );
+      return ApiResponse.withSuccess(response);
+    } catch (e) {
+      return ApiResponse.withError(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<ApiResponse> getRedeemStatus() async {
+    try {
+      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      Response response = await dioClient.get(
+        AppStrings.redeemStatusUrl,
+        options: Options(headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        }),
+      );
+      return ApiResponse.withSuccess(response);
+    } catch (e) {
+      return ApiResponse.withError(ApiErrorHandler.getMessage(e));
+    }
+  }
+
 }

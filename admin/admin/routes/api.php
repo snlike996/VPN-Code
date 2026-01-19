@@ -84,6 +84,8 @@ Route::prefix('user')->middleware(['auth:sanctum'])->group(function () {
     Route::post('/subscription/cancel', [UserController::class, 'orderCancel']);
     Route::get('/subscription/packeges', [UserController::class, 'subscriptionPackeges']);
     Route::post('/subscription/cancel/expire-date', [UserController::class, 'orderCancelExpireDate']);
+    Route::post('/redeem-code', [UserController::class, 'redeemCode']);
+    Route::get('/redeem-status', [UserController::class, 'redeemStatus']);
   
 
 

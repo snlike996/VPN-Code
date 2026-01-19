@@ -1000,3 +1000,20 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- Table structure for table `redeem_requests`
+CREATE TABLE `redeem_requests` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `code` varchar(255) NOT NULL,
+  `status` varchar(255) NOT NULL DEFAULT 'pending',
+  `approved_by` bigint(20) unsigned DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `rejected_by` bigint(20) unsigned DEFAULT NULL,
+  `rejected_at` timestamp NULL DEFAULT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `redeem_requests_user_id_status_index` (`user_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

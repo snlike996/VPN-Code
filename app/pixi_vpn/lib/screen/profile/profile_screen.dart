@@ -19,13 +19,17 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final TextEditingController _redeemCodeController = TextEditingController();
+
   void checkAuthAndFetchProfile() async {
     String token = await Get.find<AuthController>().getAuthToken();
     if (token.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Get.find<ProfileController>().getProfileData().then((value) {
+        final profileController = Get.find<ProfileController>();
+        profileController.getRedeemStatus();
+        profileController.getProfileData().then((value) {
           if (value == 200) {
-            final profile = Get.find<ProfileController>().profileData;
+            final profile = profileController.profileData;
             final isPremium = profile["isPremium"].toString() == "1";
             final expiredDate = DateTime.tryParse(profile["expired_date"].toString());
             final now = DateTime.now();
@@ -51,6 +55,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkAuthAndFetchProfile();
     });
+  }
+
+  @override
+  void dispose() {
+    _redeemCodeController.dispose();
+    super.dispose();
   }
 
   String formatDate(String dateString) {
@@ -110,6 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 final data = profileController.profileData!;
                 final isPremium = (data["isPremium"] ?? 0) == 1;
+                final remainingDays = _remainingDays(data["expired_date"]);
 
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -119,6 +130,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildProfileCard(data),
                       const SizedBox(height: 20),
                       _buildAccountCard(data, isPremium),
+                      const SizedBox(height: 20),
+                      _buildRedeemCard(
+                        profileController.hasPendingRedeem,
+                        isPremium,
+                        remainingDays,
+                      ),
                       const SizedBox(height: 30),
                       _buildLogoutButton(context),
                     ],
@@ -208,6 +225,187 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoRow(Icons.timer_outlined, "有效期", "${data["validity"] ?? "-"} 天"),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildRedeemCard(bool hasPendingRedeem, bool isPremium, int? remainingDays) {
+    String subtitleText;
+    if (hasPendingRedeem) {
+      subtitleText = "等待验证";
+    } else if (isPremium && remainingDays != null && remainingDays > 0) {
+      subtitleText = "高级会员，剩余${remainingDays}天";
+    } else {
+      subtitleText = "填写支付宝口令红包，获取365天高级会员";
+    }
+    return Container(
+      decoration: _cardDecoration(),
+      child: ListTile(
+        leading: const Icon(Icons.card_giftcard_rounded, color: Colors.black),
+        title: Text(
+          "26.8 一年不限流量 不限速套餐",
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+        ),
+        subtitle: Text(
+          subtitleText,
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+        ),
+        trailing: hasPendingRedeem
+            ? Text(
+                "等待验证",
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
+              )
+            : isPremium && remainingDays != null && remainingDays > 0
+                ? Text(
+                    "已开通",
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
+                  )
+                : const Icon(Icons.chevron_right_rounded, color: Colors.black54),
+        onTap: hasPendingRedeem ? null : _showRedeemDialog,
+      ),
+    );
+  }
+
+  int? _remainingDays(dynamic expiredDateValue) {
+    final expiredDate = expiredDateValue == null
+        ? null
+        : DateTime.tryParse(expiredDateValue.toString());
+    if (expiredDate == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    if (!expiredDate.isAfter(now)) {
+      return 0;
+    }
+    return expiredDate.difference(now).inDays;
+  }
+
+  void _showRedeemDialog() {
+    _redeemCodeController.clear();
+    showDialog(
+      context: context,
+      builder: (_) => GetBuilder<ProfileController>(
+        builder: (profileController) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '口令红包',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '请输入口令，提交后等待后台审核通过。',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _redeemCodeController,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      hintText: "填写口令红包",
+                      hintStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.black38),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: profileController.isRedeemSubmitting
+                              ? null
+                              : () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.blue),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            '取消',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: profileController.isRedeemSubmitting
+                              ? null
+                              : () async {
+                                  final code = _redeemCodeController.text.trim();
+                                  if (code.isEmpty) {
+                                    Fluttertoast.showToast(
+                                      msg: "请输入口令",
+                                      backgroundColor: Colors.orange,
+                                      textColor: Colors.white,
+                                    );
+                                    return;
+                                  }
+                                  final result = await profileController.submitRedeemCode(code);
+                                  final data = profileController.redeemData;
+                                  final message = data is Map
+                                      ? (data['message'] ?? data['error'] ?? '提交完成')
+                                      : '提交完成';
+                                  Fluttertoast.showToast(
+                                    msg: message.toString(),
+                                    backgroundColor: data is Map && data['error'] != null
+                                        ? Colors.red
+                                        : Colors.green,
+                                    textColor: Colors.white,
+                                  );
+                                  if (result == 200 && (data is Map && data['error'] == null)) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: profileController.isRedeemSubmitting
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Text(
+                                  '提交',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

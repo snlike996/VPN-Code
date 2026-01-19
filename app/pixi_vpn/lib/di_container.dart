@@ -25,16 +25,15 @@ import 'package:pixi_vpn/data/repository/v2ray_repo.dart';
 import 'package:pixi_vpn/data/repository/wg_client_repo.dart';
 import 'package:pixi_vpn/data/repository/wireguard_vpn_repo.dart';
 import 'package:pixi_vpn/utils/app_strings.dart';
+import 'package:pixi_vpn/utils/ping_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'controller/auth_controller.dart';
 import 'controller/profile_controller.dart';
-import 'controller/subscription_controller.dart';
 import 'controller/user_status_controller.dart';
 import 'data/datasource/remote/dio/dio_client.dart';
 import 'data/datasource/remote/dio/logging_interceptor.dart';
 import 'data/repository/auth_repo.dart';
 import 'data/repository/profile_repo.dart';
-import 'data/repository/subscription_repo.dart';
 import 'data/repository/user_status_repo.dart';
 
 final sl = GetIt.instance;
@@ -53,7 +52,6 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ChatRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => ProfileRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => UserStatusRepo(dioClient: sl(), secureStorage: sl()));
-  sl.registerLazySingleton(() => SubscriptionRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => AppUpdateRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => SettingRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => ContactRepo(dioClient: sl(), secureStorage: sl()));
@@ -61,17 +59,18 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ActiveServerRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => WgClientRepo(dioClient: sl(), secureStorage: sl()));
 
+  /// Utils
+  sl.registerLazySingleton(() => PingService(dio: sl()));
 
   /// Controller
   Get.lazyPut(() => AuthController(authRepo: sl(), dioClient: sl()), fenix: true);
-  Get.lazyPut(() => V2rayVpnController(v2rayVpnRepo: sl()), fenix: true);
+  Get.lazyPut(() => V2rayVpnController(v2rayVpnRepo: sl(), pingService: sl()), fenix: true);
   Get.lazyPut(() => OpenVpnController(openVpnRepo: sl()), fenix: true);
   Get.lazyPut(() => WireGuardVpnController(wireGuardVpnRepo: sl()), fenix: true);
   Get.lazyPut(() => HelpCenterController(helpCenterRepo: sl()), fenix: true);
   Get.lazyPut(() => ChatController(chatRepo: sl()), fenix: true);
   Get.lazyPut(() => ProfileController(profileRepo: sl()), fenix: true);
   Get.lazyPut(() => UserStatusController(userStatusRepo: sl()), fenix: true);
-  Get.lazyPut(() => SubscriptionController(subscriptionRepo: sl()), fenix: true);
   Get.lazyPut(() => AppSettingController(settingRepo: sl()), fenix: true);
   Get.lazyPut(() => AppUpdateController(appUpdateRepo: sl()), fenix: true);
   Get.lazyPut(() => ContactController(contactRepo: sl()), fenix: true);

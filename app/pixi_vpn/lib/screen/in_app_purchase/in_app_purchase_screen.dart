@@ -1,12 +1,8 @@
-import 'dart:async';
-import 'dart:developer';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import '../../controller/subscription_controller.dart';
-import '../profile/profile_screen.dart';
+import '../../controller/profile_controller.dart';
 
 class InAppPurchaseScreen extends StatefulWidget {
   const InAppPurchaseScreen({super.key});
@@ -16,385 +12,229 @@ class InAppPurchaseScreen extends StatefulWidget {
 }
 
 class _InAppPurchaseScreenState extends State<InAppPurchaseScreen> {
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-  late StreamSubscription<List<PurchaseDetails>>? _purchaseUpdateStream;
-
-  List<ProductDetails> _products = [];
-  final Set<String> _productIds = {
-    'one_month',
-    'three_month',
-    'six_month',
-  };
-
+  final TextEditingController _redeemCodeController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Listen for purchase updates
-    _purchaseUpdateStream = _inAppPurchase.purchaseStream.listen((List<PurchaseDetails> purchaseDetailsList) {
-      _listenToPurchaseUpdated(purchaseDetailsList);
-    }, onDone: () {
-      _purchaseUpdateStream!.cancel();
-    }, onError: (Object error) {
-      // handle error here.
-    });
-
-    // Fetch the products and ensure lifecycle integrity
-    _getProducts();
+    final profileController = Get.find<ProfileController>();
+    profileController.getRedeemStatus();
+    profileController.getProfileData();
   }
 
   @override
   void dispose() {
-    // Cancel the purchase update stream subscription on dispose
-    _purchaseUpdateStream?.cancel();
+    _redeemCodeController.dispose();
     super.dispose();
-  }
-
-
-  void _listenToPurchaseUpdated(List<PurchaseDetails> purchases) {
-    for (PurchaseDetails purchase in purchases) {
-      if (purchase.status == PurchaseStatus.purchased ||
-          purchase.status == PurchaseStatus.restored) {
-        _handleSubscription(purchase);
-        log("Purchase is done");
-      } else if (purchase.status == PurchaseStatus.error) {
-        if (kDebugMode) {
-          log("Purchase is error");
-        }
-      } else if (purchase.status == PurchaseStatus.pending) {
-        if (kDebugMode) {
-          print('Purchase is pending');
-          log("Purchase is pending");
-        }
-      }
-      else{
-        log("Not Purchase");
-      }
-    }
-  }
-
-  Future<void> _getProducts() async {
-    try {
-      ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(_productIds);
-      log("Available Products: ${response.productDetails.length}");
-      log("Not Found IDs: ${response.notFoundIDs}");
-
-      if (response.notFoundIDs.isEmpty) {
-        setState(() {
-          _products = response.productDetails;
-        });
-      } else {
-        if (kDebugMode) {
-          print('Error fetching products: ${response.notFoundIDs}');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Exception fetching products: $e');
-      }
-    }
-  }
-
-  Future<void> _buySubscription(ProductDetails product) async {
-    try {
-      final PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
-      await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error buying subscription: $e');
-      }
-    }
-  }
-
-  void _handleSubscription(PurchaseDetails purchase) {
-    if (purchase.productID == _products[2].title) {
-
-      if (purchase.pendingCompletePurchase) {
-        _inAppPurchase.completePurchase(purchase).then((value){
-          Get.find<SubscriptionController>().purchaseSubscription(
-              packageName: _products[2].title,
-              validity: 30,
-              price: _products[2].price
-          ).then((value){
-            if(value==200) {
-              Get.offAll(()=> ProfileScreen(),transition: Transition.fadeIn);
-              Get.snackbar(
-                '购买',
-                "计划购买成功",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-            }
-            else{
-              Get.snackbar(
-                '购买',
-                "出了点问题！请重试",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-            }
-          });
-        });
-      }
-
-    }
-    else if (purchase.productID == _products[1].title) {
-
-      if (purchase.pendingCompletePurchase) {
-        _inAppPurchase.completePurchase(purchase).then((value){
-          Get.find<SubscriptionController>().purchaseSubscription(
-              packageName: _products[1].title,
-              validity: 180,
-              price: _products[1].price
-          ).then((value){
-            if(value==200) {
-              Get.snackbar(
-                '购买',
-                "计划购买成功",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-              Get.offAll(()=> ProfileScreen(),transition: Transition.fadeIn);
-            }
-            else{
-              Get.snackbar(
-                '购买',
-                "出了点问题！请重试",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-            }
-          });
-        });
-      }
-
-    }
-    else if (purchase.productID == _products[3].title) {
-
-      if (purchase.pendingCompletePurchase) {
-        _inAppPurchase.completePurchase(purchase).then((value){
-          Get.find<SubscriptionController>().purchaseSubscription(
-              packageName: _products[3].title,
-              validity: 365,
-              price: _products[3].price
-          ).then((value){
-            if(value==200) {
-              Get.snackbar(
-                '购买',
-                "计划购买成功",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-              Get.offAll(()=> ProfileScreen(),transition: Transition.fadeIn);
-            }
-            else{
-              Get.snackbar(
-                '购买',
-                "出了点问题！请重试",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-            }
-          });
-        });
-      }
-
-    }
-    else if (purchase.productID == _products[0].id) {
-
-      if (purchase.pendingCompletePurchase) {
-        _inAppPurchase.completePurchase(purchase).then((value){
-          Get.find<SubscriptionController>().purchaseSubscription(
-              packageName: _products[0].title,
-              validity: 90,
-              price: _products[0].price
-          ).then((value){
-            if(value==200) {
-              Get.snackbar(
-                '购买',
-                "计划购买成功",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-              Get.offAll(()=> ProfileScreen(),transition: Transition.fadeIn);
-            }
-            else{
-              Get.snackbar(
-                '购买',
-                "出了点问题！请重试",
-                snackPosition: SnackPosition.BOTTOM,
-                duration: Duration(seconds: 1),
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                isDismissible: true,
-                snackStyle: SnackStyle.FLOATING,
-              );
-            }
-          });
-        });
-      }
-
-    }
-
-    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F8F8),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 10,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          onPressed: () {
-            Get.back();
-          },
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.black,
+    return GetBuilder<ProfileController>(
+      builder: (profileController) {
+        final data = profileController.profileData;
+        final isPremium = data != null && (data["isPremium"] ?? 0) == 1;
+        final remainingDays = data != null ? _remainingDays(data["expired_date"]) : null;
+        final hasPending = profileController.hasPendingRedeem;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F8F8),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 10,
+            leading: IconButton(
+              onPressed: () {
+                Get.back();
+              },
+              icon: const Icon(
+                Icons.arrow_back,
+                color: Colors.black,
+              ),
+            ),
+            centerTitle: true,
+            title: Text(
+              "口令红包",
+              style: GoogleFonts.poppins(
+                color: Colors.black,
+                fontSize: 16,
+                letterSpacing: 0,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-        ),
-        centerTitle: true,
-        title: Text(
-          "订阅计划",
-          style: GoogleFonts.poppins(color: Colors.black, fontSize: 16,letterSpacing: 0,
-              fontWeight: FontWeight.w500
-          ),
-        ),
-
-      ),
-      body: Center(
-        child: _products.isEmpty
-            ? const Center(
-          child: SizedBox(
-            height: 25,
-            width: 25,
-            child: CircularProgressIndicator(color: Color(0xFF4CAF50)),
-          ),
-        )
-            : ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          itemCount: _products.length,
-          itemBuilder: (context, index) {
-            ProductDetails product = _products[index];
-
-            // Determine badge
-            String? badgeText;
-            Color badgeColor = Colors.transparent;
-
-            if (index == 1) {
-              badgeText = "最受欢迎";
-              badgeColor = Colors.orangeAccent;
-            } else if (index == 2) {
-              badgeText = "节省 50%";
-              badgeColor = Colors.greenAccent.shade400;
-            }
-
-            return Stack(
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
               children: [
-                Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 6,
-                  color: const Color(0xff6C00FF),
-                  margin: const EdgeInsets.only(bottom: 20),
-                  child: ListTile(
-                    contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    title: Text(
-                      product.title,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    subtitle: const SizedBox(height: 4),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          product.price,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Icon(Icons.arrow_forward_ios,
-                            color: Colors.white54, size: 16),
-                      ],
-                    ),
-                    onTap: () => _buySubscription(product),
-                  ),
-                ),
-
-                // Badge on top right
-                if (badgeText != null)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: badgeColor,
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(12),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      child: Text(
-                        badgeText,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ),
-                  ),
+                _buildPlanCard(hasPending, isPremium, remainingDays),
+                const SizedBox(height: 18),
+                _buildRedeemForm(profileController, hasPending),
               ],
-            );
-          },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlanCard(bool hasPending, bool isPremium, int? remainingDays) {
+    String subtitleText;
+    if (hasPending) {
+      subtitleText = "等待验证";
+    } else if (isPremium && remainingDays != null && remainingDays > 0) {
+      subtitleText = "高级会员，剩余${remainingDays}天";
+    } else {
+      subtitleText = "填写支付宝口令红包，获取365天高级会员";
+    }
+
+    return Container(
+      decoration: _cardDecoration(),
+      child: ListTile(
+        leading: const Icon(Icons.card_giftcard_rounded, color: Colors.black),
+        title: Text(
+          "26.8 一年不限流量 不限速套餐",
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+        ),
+        subtitle: Text(
+          subtitleText,
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
         ),
       ),
+    );
+  }
 
+  Widget _buildRedeemForm(ProfileController profileController, bool hasPending) {
+    if (hasPending) {
+      return Container(
+        decoration: _cardDecoration(),
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: Text(
+            "等待验证",
+            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black54),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "填写支付宝口令红包",
+            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _redeemCodeController,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              hintText: "请输入口令红包",
+              hintStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.black38),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: hasPending || profileController.isRedeemSubmitting
+                  ? null
+                  : () async {
+                      final code = _redeemCodeController.text.trim();
+                      if (code.isEmpty) {
+                        Fluttertoast.showToast(
+                          msg: "请输入口令",
+                          backgroundColor: Colors.orange,
+                          textColor: Colors.white,
+                        );
+                        return;
+                      }
+                      final result = await profileController.submitRedeemCode(code);
+                      final data = profileController.redeemData;
+                      final message = data is Map
+                          ? (data['message'] ?? data['error'] ?? '提交完成')
+                          : '提交完成';
+                      Fluttertoast.showToast(
+                        msg: message.toString(),
+                        backgroundColor: data is Map && data['error'] != null
+                            ? Colors.red
+                            : Colors.green,
+                        textColor: Colors.white,
+                      );
+                      if (result == 200 && (data is Map && data['error'] == null)) {
+                        _redeemCodeController.clear();
+                        await profileController.getRedeemStatus();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: profileController.isRedeemSubmitting
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      hasPending ? "等待验证" : "提交",
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int? _remainingDays(dynamic expiredDateValue) {
+    final expiredDate = expiredDateValue == null
+        ? null
+        : DateTime.tryParse(expiredDateValue.toString());
+    if (expiredDate == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    if (!expiredDate.isAfter(now)) {
+      return 0;
+    }
+    return expiredDate.difference(now).inDays;
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: Colors.black.withValues(alpha: 0.06),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
+        ),
+      ],
     );
   }
 }

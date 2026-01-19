@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\HelpCenterController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OpenvpnController;
 use App\Http\Controllers\Admin\OpenconnectController;
+use App\Http\Controllers\Admin\RedeemRequestController;
 use App\Http\Controllers\Admin\ServerController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WireguardController;
@@ -111,6 +112,11 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
 
     /* Subscription Plan */
     Route::resource('subscription-plan', SubscriptionPlanController::class);
+
+    /* Redeem Requests */
+    Route::get('redeem-requests', [RedeemRequestController::class, 'index'])->name('admin.redeemRequests');
+    Route::post('redeem-requests/{id}/approve', [RedeemRequestController::class, 'approve'])->name('admin.redeemRequests.approve');
+    Route::post('redeem-requests/{id}/reject', [RedeemRequestController::class, 'reject'])->name('admin.redeemRequests.reject');
 
     /* Push Notification */
     Route::get('notifications', [NotificationController::class, 'index'])->name('admin.notifications'); 

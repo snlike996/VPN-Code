@@ -14,9 +14,10 @@ class AppStrings{
   static const String forgetPasswordUrl = "/api/user/forgot-password";
   static const String resetPasswordUrl = "/api/user/reset-password";
   static const String profileUrl = "/api/user/show-profile";
-  static const String subscriptionUrl = "/api/user/subscription";
   static const String userStatusUrl = "/api/user/status";
   static const String subscriptionCancelUrl = "/api/user/subscription/cancel";
+  static const String redeemCodeUrl = "/api/user/redeem-code";
+  static const String redeemStatusUrl = "/api/user/redeem-status";
   static const String chatUrl = "/api/user/chat";
   static const String appUpdateUrl = "/api/popup-setting";
   static const String appContactUrl = "/api/contact-setting";

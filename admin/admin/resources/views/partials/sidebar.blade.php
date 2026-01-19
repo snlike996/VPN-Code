@@ -71,6 +71,13 @@
             </a>
         </li>
 
+        <li class="nav-item {{ Request::routeIs('admin.redeemRequests') ? 'tactive' : '' }}">
+            <a class="nav-link" href="{{ route('admin.redeemRequests') }}">
+                <i class="fa-solid fa-gift"></i>
+                <span class="ml-2 menu-title">口令红包审核</span>
+            </a>
+        </li>
+
         <li class="nav-item {{ Request::routeIs('settings') && !Request::routeIs('settings.general') && !Request::routeIs('settings.popup') && !Request::routeIs('settings.contact') && !Request::routeIs('settings.app') && !Request::routeIs('settings.ads') ? 'tactive' : '' }}">
     <a class="nav-link d-flex justify-content-between align-items-center" data-toggle="collapse" href="#settingsMenu">
         <div>

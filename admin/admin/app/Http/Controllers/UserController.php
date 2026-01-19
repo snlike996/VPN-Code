@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Package;
+use App\Models\RedeemRequest;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -386,6 +387,58 @@ class UserController extends Controller
             return response()->json($user, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'User retrieval failed'], 200);
+        }
+    }
+
+    public function redeemCode(Request $request)
+    {
+        try {
+            $request->validate([
+                'code' => 'required|string|max:255',
+            ]);
+
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => '未授权'], 200);
+            }
+
+            $pending = RedeemRequest::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->first();
+            if ($pending) {
+                return response()->json(['error' => '已有待审核口令'], 200);
+            }
+
+            RedeemRequest::create([
+                'user_id' => $user->id,
+                'code' => $request->code,
+                'status' => 'pending',
+            ]);
+
+            return response()->json(['message' => '提交成功，等待审核'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => '提交失败'], 200);
+        }
+    }
+
+    public function redeemStatus()
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => '未授权'], 200);
+            }
+
+            $pending = RedeemRequest::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->latest()
+                ->first();
+
+            return response()->json([
+                'status' => $pending ? 'pending' : 'none',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => '获取状态失败'], 200);
         }
     }
      public function userStatus()

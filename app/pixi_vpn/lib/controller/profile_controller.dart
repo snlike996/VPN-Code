@@ -10,9 +10,12 @@ class ProfileController extends GetxController {
   bool isLoading = false;
 
   bool isLoadingCancel = false;
+  bool isRedeemSubmitting = false;
+  bool hasPendingRedeem = false;
 
   dynamic profileData;
   dynamic subscriptionCancelData;
+  dynamic redeemData;
 
   Future<dynamic> getProfileData() async {
     isLoading = true;
@@ -45,6 +48,37 @@ class ProfileController extends GetxController {
     } else {
       isLoadingCancel = false;
       update();
+    }
+  }
+
+  Future<dynamic> submitRedeemCode(String code) async {
+    isRedeemSubmitting = true;
+    update();
+    ApiResponse apiResponse = await profileRepo.submitRedeemCode(code: code);
+
+    if (apiResponse.response != null && apiResponse.response!.statusCode == 200) {
+      isRedeemSubmitting = false;
+      update();
+      redeemData = apiResponse.response!.data;
+      if (redeemData is Map && redeemData['message'] != null) {
+        hasPendingRedeem = true;
+      }
+      update();
+      return apiResponse.response!.statusCode;
+    } else {
+      isRedeemSubmitting = false;
+      update();
+    }
+  }
+
+  Future<void> getRedeemStatus() async {
+    ApiResponse apiResponse = await profileRepo.getRedeemStatus();
+    if (apiResponse.response != null && apiResponse.response!.statusCode == 200) {
+      final data = apiResponse.response!.data;
+      if (data is Map) {
+        hasPendingRedeem = data['status'] == 'pending';
+        update();
+      }
     }
   }
 
