@@ -130,10 +130,17 @@ jobs:
         working-directory: app/pixi_vpn
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
-          Copy-Item -Path "$env:WIN_RELEASE_DIR/*" `
-            -Destination build/windows/x64/runner/Release `
-            -Recurse -Force
+          $target = Resolve-Path -LiteralPath "build/windows/x64/runner/Release" -ErrorAction SilentlyContinue
+          if ($null -eq $target) {
+            New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
+            $target = Resolve-Path -LiteralPath "build/windows/x64/runner/Release"
+          }
+          $source = Resolve-Path -LiteralPath "$env:WIN_RELEASE_DIR"
+          if ($source.Path -ne $target.Path) {
+            Copy-Item -Path "$($source.Path)\*" `
+              -Destination $target.Path `
+              -Recurse -Force
+          }
 
       - name: Prepare portable zip
         working-directory: app/pixi_vpn
