@@ -22,14 +22,11 @@ class AppSettingController extends Controller
     public function general()
     {
         $settings = AppSetting::getValues([
-            'wireguard_status',
             'v2ray_status',
-            'openvpn_status',
             'paginate',
             'app_logo',
             'short_logo',
             'device_limit',
-            'default_protocol',
             'openconnect_status',
             'ads_click',
             'ads_setting',
@@ -142,7 +139,7 @@ class AppSettingController extends Controller
     {
         try {
             // Handle text/select fields
-            $fields = ['wireguard_status', 'v2ray_status', 'openvpn_status', 'paginate', 'device_limit', 'default_protocol', 'openconnect_status', 'ads_click', 'ads_setting'];
+            $fields = ['v2ray_status', 'paginate', 'device_limit', 'openconnect_status', 'ads_click', 'ads_setting'];
             foreach ($fields as $field) {
                 if ($request->has($field)) {
                     AppSetting::setValue($field, $request->input($field));

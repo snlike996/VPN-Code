@@ -4,14 +4,10 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:pixi_vpn/screen/home/v2_home_screen.dart';
 import 'package:pixi_vpn/screen/auth/signin_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../controller/general_setting_controller.dart';
 import '../data/datasource/remote/dio/dio_client.dart';
 import '../data/model/base_model/api_response.dart';
 import '../data/repository/auth_repo.dart';
 import '../screen/auth/reset_password_screen.dart';
-import '../screen/home/open_vpn_home_screen.dart';
-import '../screen/home/wg_home_screen.dart';
 
 class AuthController extends GetxController {
   final DioClient dioClient;
@@ -249,71 +245,6 @@ class AuthController extends GetxController {
   // ================= NAVIGATION =================
 
   Future<void> _navigateToSelectedProtocol() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? selectedProtocol = prefs.getString('selected_vpn_protocol');
-
-    // If user hasn't selected a protocol, use default from API
-    if (selectedProtocol == null || selectedProtocol.isEmpty) {
-      final generalSettingController = Get.find<GeneralSettingController>();
-      final generalData = generalSettingController.appGeneralData;
-
-      if (generalData != null) {
-        String defaultProtocol = generalData['default_protocol'] ?? 'v2ray';
-
-        // Navigate based on default protocol from API
-        switch (defaultProtocol.toLowerCase()) {
-          case 'openvpn':
-            Get.offAll(() => const OpenVpnHomeScreen(), transition: Transition.leftToRight);
-            return;
-          case 'v2ray':
-            Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-            return;
-          case 'wireguard':
-            Get.offAll(() => const WGHomeScreen(), transition: Transition.leftToRight);
-            return;
-          default:
-            Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-            return;
-        }
-      } else {
-        // If API data is not available, default to V2Ray
-        Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-        return;
-      }
-    }
-
-    // User has selected a protocol locally, use that
-    if (selectedProtocol == 'openvpn') {
-      Get.offAll(() => const OpenVpnHomeScreen(), transition: Transition.leftToRight);
-    } else if (selectedProtocol == 'v2ray') {
-      Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-    } else if (selectedProtocol == 'wireguard') {
-      Get.offAll(() => const WGHomeScreen(), transition: Transition.leftToRight);
-    } else {
-      // Automatic (Recommended) or any other value - use default from API
-      final generalSettingController = Get.find<GeneralSettingController>();
-      final generalData = generalSettingController.appGeneralData;
-
-      if (generalData != null) {
-        String defaultProtocol = generalData['default_protocol'] ?? 'v2ray';
-
-        switch (defaultProtocol.toLowerCase()) {
-          case 'openvpn':
-            Get.offAll(() => const OpenVpnHomeScreen(), transition: Transition.leftToRight);
-            return;
-          case 'v2ray':
-            Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-            return;
-          case 'wireguard':
-            Get.offAll(() => const WGHomeScreen(), transition: Transition.leftToRight);
-            return;
-          default:
-            Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-            return;
-        }
-      } else {
-        Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
-      }
-    }
+    Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
   }
 }

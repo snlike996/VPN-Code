@@ -7,14 +7,12 @@ use App\Http\Controllers\Admin\ChatController;
 use App\Http\Controllers\Admin\DashBoardController;
 use App\Http\Controllers\Admin\HelpCenterController;
 use App\Http\Controllers\Admin\NotificationController;
-use App\Http\Controllers\Admin\OpenvpnController;
 use App\Http\Controllers\Admin\OpenconnectController;
 use App\Http\Controllers\Admin\RedeemRequestController;
 use App\Http\Controllers\Admin\ServerController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\WireguardController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
-use App\Http\Controllers\Admin\V2rayController;
+use App\Http\Controllers\Admin\V2raySubscriptionController;
 use App\Http\Controllers\EpayController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,19 +51,10 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::post('user', [UserController::class, 'register'])->name('admin.user.add');
     Route::post('user/{id}', [UserController::class, 'registerUpdate'])->name('admin.user.update');
     
-    /* V2ray */
-    Route::post('v2ray/add', [V2rayController::class, 'store'])->name('admin.v2ray.add');
-    Route::put('v2ray/update/{id}', [V2rayController::class, 'update'])->name('admin.v2ray.update');
-    Route::get('v2ray/delete/{id}', [V2rayController::class, 'destroy'])->name('admin.v2ray.delete');
-    Route::get('v2ray/list', [V2rayController::class, 'index'])->name('admin.v2ray.list');
-    Route::post('v2ray/status/{id}', [V2rayController::class, 'status'])->name('admin.v2ray.status');
-
-    /* OpenVpn */
-    Route::post('openvpn/add', [OpenvpnController::class, 'store'])->name('admin.openvpn.add');
-    Route::put('openvpn/update/{id}', [OpenvpnController::class, 'update'])->name('admin.openvpn.update');
-    Route::get('openvpn/delete/{id}', [OpenvpnController::class, 'destroy'])->name('admin.openvpn.delete');
-    Route::get('openvpn/list', [OpenvpnController::class, 'index'])->name('admin.openvpn.list');
-    Route::post('openvpn/status/{id}', [OpenvpnController::class, 'status'])->name('admin.openvpn.status');
+    /* V2ray Subscriptions */
+    Route::get('v2ray/subscriptions', [V2raySubscriptionController::class, 'index'])->name('admin.v2ray.subscriptions');
+    Route::post('v2ray/subscriptions', [V2raySubscriptionController::class, 'store'])->name('admin.v2ray.subscriptions.store');
+    Route::post('v2ray/subscriptions/delete', [V2raySubscriptionController::class, 'delete'])->name('admin.v2ray.subscriptions.delete');
 
     /* OpenConnect */
     Route::post('openconnect/add', [OpenconnectController::class, 'store'])->name('admin.openconnect.add');
@@ -74,12 +63,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('openconnect/list', [OpenconnectController::class, 'index'])->name('admin.openconnect.list');
     Route::post('openconnect/status/{id}', [OpenconnectController::class, 'status'])->name('admin.openconnect.status');
 
-    /* Wireguard */
-    Route::post('wireguard/add', [WireguardController::class, 'store'])->name('admin.wireguard.add');
-    Route::put('wireguard/update/{id}', [WireguardController::class, 'update'])->name('admin.wireguard.update');
-    Route::get('wireguard/delete/{id}', [WireguardController::class, 'destroy'])->name('admin.wireguard.delete');
-    Route::get('wireguard/list', [WireguardController::class, 'index'])->name('admin.wireguard.list');
-    Route::post('wireguard/status/{id}', [WireguardController::class, 'status'])->name('admin.wireguard.status');
+    // WireGuard/OpenVPN admin routes removed (subscription-only mode)
 
     /* Active Connections */
     Route::get('active-connections', [ActiveConnectionsController::class, 'index'])->name('admin.activeConnections');

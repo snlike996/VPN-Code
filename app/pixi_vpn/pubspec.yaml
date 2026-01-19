@@ -62,10 +62,6 @@ dependencies:
   firebase_core: ^4.0.0
   cloud_firestore: ^6.0.0
   firebase_analytics: ^12.0.4
-  openvpn_flutter:
-    path: openvpn_flutter
-  wireguard_flutter:
-    path: wireguard_flutter
 
 icons_launcher:
   image_path: "logo-216-mono.png"

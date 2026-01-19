@@ -13,41 +13,12 @@
             </a>
         </li>
         
-        @php
-            $wireguard_status = \App\Models\AppSetting::where('key', 'wireguard_status')->value('value');
-        @endphp
-        @if($wireguard_status == 1)
-        <li class="nav-item {{ Request::routeIs('admin.wireguard.list') ? 'tactive' : '' }}">
-            <a class="nav-link" href="{{ route('admin.wireguard.list') }}">
-                <i class="fa-solid fa-ticket"></i>
-                <span class="ml-2 menu-title">WireGuard 服务器</span>
-            </a>
-        </li>
-        @endif
-
-        @php
-            $v2ray_status = \App\Models\AppSetting::where('key', 'v2ray_status')->value('value');
-        @endphp
-        @if($v2ray_status == 1)
-        <li class="nav-item {{ Request::routeIs('admin.v2ray.list') ? 'tactive' : '' }}">
-            <a class="nav-link" href="{{ route('admin.v2ray.list') }}">
+        <li class="nav-item {{ Request::routeIs('admin.v2ray.subscriptions') ? 'tactive' : '' }}">
+            <a class="nav-link" href="{{ route('admin.v2ray.subscriptions') }}">
                 <i class="fa-solid fa-window-restore"></i>
-                <span class="ml-2 menu-title">V2Ray 服务器</span>
+                <span class="ml-2 menu-title">V2Ray 订阅配置</span>
             </a>
         </li>
-        @endif
-
-        @php
-            $openvpn_status = \App\Models\AppSetting::where('key', 'openvpn_status')->value('value');
-        @endphp
-        @if($openvpn_status == 1)
-        <li class="nav-item {{ Request::routeIs('admin.openvpn.list') ? 'tactive' : '' }}">
-            <a class="nav-link" href="{{ route('admin.openvpn.list') }}">
-                <i class="fa-solid fa-x-ray"></i>
-                <span class="ml-2 menu-title">OpenVPN 服务器</span>
-            </a>
-        </li>
-        @endif
       
 
         <li class="nav-item {{ Request::routeIs('admin.activeConnections') ? 'tactive' : '' }}">

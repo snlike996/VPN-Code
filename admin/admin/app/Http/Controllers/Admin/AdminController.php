@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Server;
-use App\Models\Wireguard;
+use App\Models\V2raySubscriptionConfig;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -50,7 +50,7 @@ class AdminController extends Controller
     public function profile()
     {
         $admin = Auth::guard('admins')->user();
-        $servers = Wireguard::count();
+        $servers = V2raySubscriptionConfig::count();
 
         return view('admin.profile', compact('admin', 'servers'));
     }

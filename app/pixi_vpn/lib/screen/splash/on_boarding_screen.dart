@@ -186,7 +186,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            '从多种 VPN 协议中进行选择，以获得最佳速度和安全性。',
+            '使用 V2Ray 订阅链接自动拉取节点，兼顾速度与安全。',
             style: GoogleFonts.openSans(fontSize: 15, color: const Color(0xFF6B7280)),
             textAlign: TextAlign.center,
           ),
@@ -195,11 +195,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen>
           // Protocol Cards
           Column(
             children: [
-              _protocolCard('V2Ray', '高级且快速', Icons.shield_outlined, const Color(0xFF8B5CF6)),
-              const SizedBox(height: 12),
-              _protocolCard('WireGuard', '现代且高效', Icons.flash_on_rounded, const Color(0xFFEC4899)),
-              const SizedBox(height: 12),
-              _protocolCard('OpenVPN', '可靠且安全', Icons.vpn_key_rounded, const Color(0xFF3B82F6)),
+              _protocolCard('V2Ray', '订阅链接模式', Icons.shield_outlined, const Color(0xFF8B5CF6)),
             ],
           ),
           const SizedBox(height: 20),

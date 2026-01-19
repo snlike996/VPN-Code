@@ -38,8 +38,6 @@
                 <div class="input-group">
                     <select name="protocol" id="protocolFilter" class="form-control search-input">
                         <option value="all" {{ request('protocol', 'all') == 'all' ? 'selected' : '' }}>所有协议</option>
-                        <option value="wireguard" {{ request('protocol') == 'wireguard' ? 'selected' : '' }}>WireGuard</option>
-                        <option value="openvpn" {{ request('protocol') == 'openvpn' ? 'selected' : '' }}>OpenVPN</option>
                         <option value="v2ray" {{ request('protocol') == 'v2ray' ? 'selected' : '' }}>V2Ray</option>
                         
                     </select>
@@ -69,11 +67,7 @@
                         <td>{{ ucwords($connection['name']) }}</td>
                         
                         <td>
-                            @if($connection['protocol'] == 'wireguard')
-                                <span class="badge bg-info">WireGuard</span>
-                            @elseif($connection['protocol'] == 'openvpn')
-                                <span class="badge bg-success">OpenVPN</span>
-                            @elseif($connection['protocol'] == 'v2ray')
+                            @if($connection['protocol'] == 'v2ray')
                                 <span class="badge bg-warning">V2Ray</span>
                             @elseif($connection['protocol'] == 'openconnect')
                                 <span class="badge bg-danger">OpenConnect</span>
@@ -141,4 +135,3 @@ $(document).ready(function () {
 });
 </script>
 @endpush
-

@@ -31,34 +31,12 @@
 
                     <div class="col-md-4">
                         @php
-                            $wireguard_status = \App\Models\AppSetting::where('key', 'wireguard_status')->value('value');
-                        @endphp
-                        <label for="wireguard_status" class="form-label">Wireguard状态</label>
-                        <select name="wireguard_status" class="form-select input-dark">
-                            <option value="1" {{ $wireguard_status == 1 ? 'selected' : '' }}>启用</option>
-                            <option value="0" {{ $wireguard_status == 0 ? 'selected' : '' }}>禁用</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        @php
                             $v2ray_status = \App\Models\AppSetting::where('key', 'v2ray_status')->value('value');
                         @endphp
                         <label for="v2ray_status" class="form-label">V2ray状态</label>
                         <select name="v2ray_status" class="form-select input-dark">
                             <option value="1" {{ $v2ray_status == 1 ? 'selected' : '' }}>启用</option>
                             <option value="0" {{ $v2ray_status == 0 ? 'selected' : '' }}>禁用</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        @php
-                            $openvpn_status = \App\Models\AppSetting::where('key', 'openvpn_status')->value('value');
-                        @endphp
-                        <label for="openvpn_status" class="form-label">OpenVPN状态</label>
-                        <select name="openvpn_status" class="form-select input-dark">
-                            <option value="1" {{ $openvpn_status == 1 ? 'selected' : '' }}>启用</option>
-                            <option value="0" {{ $openvpn_status == 0 ? 'selected' : '' }}>禁用</option>
                         </select>
                     </div>
 

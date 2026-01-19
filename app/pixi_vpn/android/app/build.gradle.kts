@@ -10,7 +10,7 @@ import java.util.Properties
 
 android {
     namespace = "com.app.pixivpngold"
-    compileSdk = 36
+    compileSdk = 34
     ndkVersion = "28.1.13356709"
 
     packaging {
@@ -34,7 +34,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = 36
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         vectorDrawables {
@@ -49,18 +49,41 @@ android {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
+    val envStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val envStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val envKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val envKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+
+    val storeFilePath = envStorePath ?: keystoreProperties.getProperty("storeFile")
+    val keystoreFile = if (storeFilePath != null) rootProject.file(storeFilePath) else null
+    val keyAliasValue = envKeyAlias ?: keystoreProperties.getProperty("keyAlias")
+    val keyPasswordValue = envKeyPassword ?: keystoreProperties.getProperty("keyPassword")
+    val storePasswordValue = envStorePassword ?: keystoreProperties.getProperty("storePassword")
+
+    val hasKeystore = keystoreFile != null &&
+        keystoreFile.exists() &&
+        !keyAliasValue.isNullOrBlank() &&
+        !keyPasswordValue.isNullOrBlank() &&
+        !storePasswordValue.isNullOrBlank()
+
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = if (keystoreProperties.getProperty("storeFile") != null) file(keystoreProperties.getProperty("storeFile")) else null
-            storePassword = keystoreProperties.getProperty("storePassword")
+            if (hasKeystore) {
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+                storeFile = keystoreFile
+                storePassword = storePasswordValue
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

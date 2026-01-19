@@ -1017,3 +1017,19 @@ CREATE TABLE `redeem_requests` (
   PRIMARY KEY (`id`),
   KEY `redeem_requests_user_id_status_index` (`user_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table structure for table `v2ray_subscription_configs`
+DROP TABLE IF EXISTS `v2ray_subscription_configs`;
+CREATE TABLE IF NOT EXISTS `v2ray_subscription_configs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `country_code` VARCHAR(8) NOT NULL COMMENT '国家代码，如 us cn jp',
+  `country_name` VARCHAR(32) NOT NULL COMMENT '国家名称',
+  `subscription_url` TEXT NOT NULL COMMENT 'V2Ray 订阅链接',
+  `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `remark` VARCHAR(255) NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_country` (`country_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -19,21 +19,6 @@
     <div class="row g-4 mt-3 px-3">
     
         @php
-            $wireguard_status = \App\Models\AppSetting::where('key', 'wireguard_status')->value('value');
-        @endphp
-
-        @if($wireguard_status == 1)
-        <div class="col-md-3">
-            <div class="card dashboard-card shadow-sm">
-                <div class="card-body text-center py-4">
-                    <h6 class="mb-2">WireGuard 服务器总数</h6>
-                    <h3 class="fw-bold">{{ $counts['wireguardServers'] }}</h3>
-                </div>
-            </div>
-        </div>
-        @endif
-
-        @php
             $v2ray_status = \App\Models\AppSetting::where('key', 'v2ray_status')->value('value');
         @endphp
 
@@ -41,27 +26,13 @@
         <div class="col-md-3">
             <div class="card dashboard-card shadow-sm">
                 <div class="card-body text-center py-4">
-                    <h6 class="mb-2">V2Ray 服务器总数</h6>
+                    <h6 class="mb-2">V2Ray 订阅国家数</h6>
                     <h3 class="fw-bold">{{ $counts['v2rayServers'] }}</h3>
                 </div>
             </div>
         </div>
         @endif
 
-        @php
-            $openvpn_status = \App\Models\AppSetting::where('key', 'openvpn_status')->value('value');
-        @endphp
-
-        @if($openvpn_status == 1)
-        <div class="col-md-3">
-            <div class="card dashboard-card shadow-sm">
-                <div class="card-body text-center py-4">
-                    <h6 class="mb-2">OpenVPN 服务器总数</h6>
-                    <h3 class="fw-bold">{{ $counts['openvpnServers'] }}</h3>
-                </div>
-            </div>
-        </div>
-        @endif
         @php
             $openconnect_status = \App\Models\AppSetting::where('key', 'openconnect_status')->value('value');
         @endphp
@@ -122,11 +93,7 @@
                     <tr class="text-center">
                         <td>{{ ucwords($server->name) }}</td>
                         <td>
-                            @if($server->protocol == 'wireguard')
-                                <span class="badge bg-info">Wireguard</span>
-                            @elseif($server->protocol == 'openvpn')
-                                <span class="badge bg-success">OpenVPN</span>
-                            @elseif($server->protocol == 'v2ray')
+                            @if($server->protocol == 'v2ray')
                                 <span class="badge bg-warning">V2ray</span>
                             @elseif($server->protocol == 'openconnect')
                                 <span class="badge bg-danger">OpenConnect</span>

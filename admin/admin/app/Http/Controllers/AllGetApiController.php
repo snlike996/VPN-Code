@@ -7,10 +7,8 @@ use App\Models\Admob;
 use App\Models\AppSetting;
 use App\Models\Ikev;
 use App\Models\Ikev2;
-use App\Models\OpenVpn;
 use App\Models\Sstp;
 use App\Models\V2ray;
-use App\Models\Wireguard;
 use Illuminate\Http\Request;
 use Exception;
 
@@ -88,149 +86,6 @@ class AllGetApiController extends Controller
             ], 200);
         }
     }
-    public function openvpn(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = OpenVpn::where('status', 1)->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'OpenVpn server list retrieval failed'], 200);
-        }
-    }
-
-    public function openvpn_free(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = OpenVpn::where(['status'=> 1, 'type' => '0'])->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'OpenVpn server list retrieval failed'], 200);
-        }
-    }
-    public function openvpn_premium(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = OpenVpn::where(['status'=> 1, 'type' => '1'])->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'OpenVpn server list retrieval failed'], 200);
-        }
-    }
-
-    public function openvpn_search(Request $request)
-    {
-        try {
-            $query = OpenVpn::query();
-            $query->where('status', 1);
-            // input search (case-insensitive)
-            if ($request->filled('search_text')) {
-                $q = strtolower($request->search_text);
-
-                $query->where(function ($sub) use ($q) {
-                    $sub->whereRaw('LOWER(name) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(country_code) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(city_name) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(link) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(username) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(password) LIKE ?', ["%{$q}%"]);
-                });
-            }
-
-            // select search (type only, case-insensitive)
-            if ($request->filled('type')) {
-                $query->whereRaw('LOWER(type) = ?', [strtolower($request->type)]);
-            }
-
-            $results = $query->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $results,
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ], 200);
-        }
-    }
-    public function wireguard(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = Wireguard::where('status', 1)->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Wireguard server list retrieval failed'], 200);
-        }
-    }
-    public function wireguard_free(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = Wireguard::where(['status'=> 1, 'type' => '0'])->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Wireguard server list retrieval failed'], 200);
-        }
-    }
-    public function wireguard_premium(Request $request)
-    {
-        try {
-            $perPage = $request->input('paginate', 10000);
-            $servers = Wireguard::where(['status'=> 1, 'type' => '1'])->paginate($perPage);
-
-            return response()->json($servers);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Wireguard server list retrieval failed'], 200);
-        }
-    }
-    public function wireguard_search(Request $request)
-    {
-        try {
-            $query = Wireguard::query();
-            $query->where('status', 1);
-
-            // input search (case-insensitive)
-            if ($request->filled('search_text')) {
-                $q = strtolower($request->search_text);
-
-                $query->where(function ($sub) use ($q) {
-                    $sub->whereRaw('LOWER(name) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(country_code) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(link) LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw('LOWER(address) LIKE ?', ["%{$q}%"]);
-                });
-            }
-
-            // select search (type only, case-insensitive)
-            if ($request->filled('type')) {
-                $query->whereRaw('LOWER(type) = ?', [strtolower($request->type)]);
-            }
-
-            $results = $query->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $results,
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ], 200);
-        }
-    }
 
 
     public function setting()
@@ -246,15 +101,12 @@ class AllGetApiController extends Controller
     {
         try {
             $settings = AppSetting::getValues([
-                'wireguard_status',
                 'v2ray_status',
-                'openvpn_status',
                 'openconnect_status',
                 'paginate',
                 'app_logo',
                 'short_logo',
                 'device_limit',
-                'default_protocol',
                 'ads_click',
                 'ads_setting',
             ]);
@@ -374,8 +226,6 @@ class AllGetApiController extends Controller
 
             $servers = [
                 'v2ray'     => V2ray::where('status', 1)->tap($applyFilters)->paginate($perPage),
-                'openvpn'   => OpenVpn::where('status', 1)->tap($applyFilters)->paginate($perPage),
-                'wireguard' => Wireguard::where('status', 1)->tap($applyFilters)->paginate($perPage),
             ];
 
             return response()->json($servers);
@@ -387,12 +237,10 @@ class AllGetApiController extends Controller
         }
     }
 
-    private function getModelByProtocol($protocol)
+private function getModelByProtocol($protocol)
 {
     return match ($protocol) {
-        'wireguard' => \App\Models\Wireguard::class,
         'v2ray'     => \App\Models\V2ray::class,
-        'openvpn'   => \App\Models\OpenVpn::class,
         'openconnect' => \App\Models\OpenConnect::class,
         default     => null
     };

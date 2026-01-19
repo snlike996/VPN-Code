@@ -5,9 +5,8 @@ class AppStrings{
   static const String tokenKey = 'auth_token';
 
   //API ENDPOINTS
-  static const String v2rayUrl = "/api/v2ray/list";
-  static const String wireGuardVpUrl = "/api/wireguard/list";
-  static const String openVpnUrl = "/api/openvpn/list";
+  static const String v2rayCountriesUrl = "/api/v1/v2ray/countries";
+  static const String v2raySubscriptionContentUrl = "/api/v1/v2ray/subscription/content";
   static const String helpCenterUrl = "/api/helpcenter/search";
   static const String loginUrl = "/api/auth/user/login";
   static const String registerUrl = "/api/auth/user/register";
@@ -26,7 +25,5 @@ class AppStrings{
   static const String admobUrl = "/api/admob-setting";
   static const String serverConnect = "/api/server-connect";
   static const String serverDisConnect = "/api/server-disconnect";
-  static const String wireGuardClientGenerate = "/api/vpn/generate";
-  static const String wireGuardClientRemove = "/api/vpn/remove-client";
 
 }

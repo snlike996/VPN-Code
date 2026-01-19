@@ -17,11 +17,9 @@ import '../../ads/ads_service.dart';
 import '../../controller/active_server_controller.dart';
 import '../../controller/app_setting_controller.dart';
 import '../../controller/contact_controller.dart';
-import '../../controller/v2ray_vpn_controller.dart';
 import '../profile/profile_screen.dart';
 import '../setting/dynamic_content_screen.dart';
 import '../setting/help_center_screen.dart';
-import '../setting/select_protocol_screen.dart';
 
 enum VPNStatus { disconnected, connecting, connected, disconnecting }
 
@@ -42,8 +40,6 @@ class _VPNHomePageState extends State<V2HomeScreen>
 
   dynamic config;
   dynamic id;
-  dynamic isPremium;
-  String? countryCode;
   bool isConnect = false;
   bool isProcessing = false;
 
@@ -304,38 +300,24 @@ class _VPNHomePageState extends State<V2HomeScreen>
 
   Future<void> _initializeApp() async {
     try {
-      final controller = Get.find<V2rayVpnController>();
-
       // Load config from SharedPreferences
       await _loadConfigData();
 
-      // If no config or server name is loaded, just fetch server list and do not auto-select.
+      // If no config or server name is loaded, prompt user to pick a country/node.
       if (config.isEmpty || serverName.isEmpty) {
         if (kDebugMode) {
-          print('No server selected. Fetching server list...');
+          print('No node selected. Prompting user to choose a country/node.');
         }
-
-        // Fetch server list from API; do NOT auto-save or auto-select any server.
-        await controller.getV2rayVpnData();
-
-        // If no servers available, inform the user.
-        if (controller.vpnServers.isEmpty) {
-          Fluttertoast.showToast(
-            msg: "暂无可用VPN服务器",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.red,
-            textColor: Colors.white,
-            fontSize: 12.0,
-          );
-        }
-      } else {
-        if (kDebugMode) {
-          print('Server already selected: $serverName');
-        }
-
-        // Still fetch servers for quick connect list (we don't store them locally)
-        await controller.getV2rayVpnData();
+        Fluttertoast.showToast(
+          msg: "请先选择国家和节点",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 12.0,
+        );
+      } else if (kDebugMode) {
+        print('Node already selected: $serverName');
       }
 
       setState(() {});
@@ -351,16 +333,17 @@ class _VPNHomePageState extends State<V2HomeScreen>
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
       id = prefs.getInt('id');
+      if (id == 0) {
+        id = null;
+      }
       serverName = _decodeBase64(prefs.getString('name_v'));
       config = _decodeBase64(prefs.getString('link_v'));
-      isPremium = _decodeBase64(prefs.getString('isPremium_v'));
-      countryCode = _decodeBase64(prefs.getString('country_code_v'));
 
       // Update selected country and flag
       if (serverName.isNotEmpty) {
         _selectedCountry = serverName;
-        _selectedFlag = _getFlagEmoji(countryCode ?? '');
       }
+      _selectedFlag = '🌍';
 
       if (kDebugMode) {
         print('Loaded id: $id');
@@ -411,17 +394,6 @@ class _VPNHomePageState extends State<V2HomeScreen>
     }
   }
 
-
-  String _getFlagEmoji(String countryCode) {
-    if (countryCode.isEmpty) return '🌍';
-
-    // Convert country code to flag emoji
-    final code = countryCode.toUpperCase();
-    if (code.length != 2) return '🌍';
-
-    return String.fromCharCode(code.codeUnitAt(0) + 127397) +
-        String.fromCharCode(code.codeUnitAt(1) + 127397);
-  }
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -501,14 +473,6 @@ class _VPNHomePageState extends State<V2HomeScreen>
             children: <Widget>[
 
               SizedBox(height: 80,),
-
-              ListTile(
-                leading: Icon(Icons.vpn_key),
-                title: Text('选择协议'),
-                onTap: () {
-                  Get.to(()=> SelectProtocolScreen(),transition: Transition.fadeIn);
-                },
-              ),
 
               ListTile(
                 leading: Icon(Icons.chat),
@@ -798,10 +762,12 @@ class _VPNHomePageState extends State<V2HomeScreen>
                                         _showRewardedAd();
                                       }
 
-                                      Get.find<ActiveServerController>().serverDisConnect(
-                                        id: id,
-                                        protocolName: "v2ray",
-                                      );
+                                      if (id != null && id != 0) {
+                                        Get.find<ActiveServerController>().serverDisConnect(
+                                          id: id,
+                                          protocolName: "v2ray",
+                                        );
+                                      }
 
                                       Get.snackbar(
                                         "提示",
@@ -848,10 +814,12 @@ class _VPNHomePageState extends State<V2HomeScreen>
 
                                       try {
                                         await performV2Connect();
-                                        Get.find<ActiveServerController>().serverConnect(
-                                          id: id,
-                                          protocolName: "v2ray",
-                                        );
+                                        if (id != null && id != 0) {
+                                          Get.find<ActiveServerController>().serverConnect(
+                                            id: id,
+                                            protocolName: "v2ray",
+                                          );
+                                        }
                                       } catch (e) {
                                         if (kDebugMode) print('Connect after rewarded failed: $e');
                                         Get.snackbar("错误", '连接失败: $e', backgroundColor: Colors.red, colorText: Colors.white);

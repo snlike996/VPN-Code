@@ -11,13 +11,20 @@ class V2rayVpnRepo {
 
   V2rayVpnRepo({required this.dioClient, required this.secureStorage});
 
-  Future<ApiResponse> getV2rayVpnData() async {
+  Future<ApiResponse> getCountries() async {
     try {
+      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      final headers = <String, String>{
+        "Accept": "application/json",
+      };
+      if (token != null && token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
       Response response = await dioClient.get(
-        AppStrings.v2rayUrl,
-        options: Options(headers: {
-          "Content-Type": "application/json",
-        }),
+        AppStrings.v2rayCountriesUrl,
+        options: Options(
+          headers: headers,
+        ),
       );
       return ApiResponse.withSuccess(response);
     } catch (e) {
@@ -25,5 +32,29 @@ class V2rayVpnRepo {
     }
   }
 
+  Future<ApiResponse> getSubscriptionContent(String countryCode) async {
+    try {
+      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      final headers = <String, String>{
+        "Accept": "text/plain",
+      };
+      if (token != null && token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
+      Response response = await dioClient.get(
+        AppStrings.v2raySubscriptionContentUrl,
+        queryParameters: {
+          'country': countryCode,
+        },
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: headers,
+        ),
+      );
+      return ApiResponse.withSuccess(response);
+    } catch (e) {
+      return ApiResponse.withError(ApiErrorHandler.getMessage(e));
+    }
+  }
 
 }

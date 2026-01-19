@@ -3,23 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\OpenVpn;
 use App\Models\Order;
 use App\Models\User;
-use App\Models\V2ray;
-use App\Models\Wireguard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\AppSetting;
 use App\Models\OpenConnect;
+use App\Models\V2raySubscriptionConfig;
 
 class DashBoardController extends Controller
 {
     public function index()
     {
-        $v2rayServers = V2ray::count();
-        $openvpnServers = OpenVpn::count();
-        $wireguardServers = Wireguard::count();
+        $v2rayServers = V2raySubscriptionConfig::count();
         $openconnectServers = OpenConnect::count();
         $activeUsers = User::activeUsers()->count();
         $users = User::count();
@@ -33,29 +29,12 @@ class DashBoardController extends Controller
         $totalRevenue = Order::sum('price');
 
         $settings = AppSetting::getValues([
-            'wireguard_status',
             'v2ray_status',
-            'openvpn_status',
             'openconnect_status'
         ]);
         
         $unions = [];
         
-        if ($settings['wireguard_status'] == 1) {
-            $unions[] = "
-                SELECT id, name, active_count, 'wireguard' AS protocol
-                FROM wireguards
-                WHERE status = 1
-            ";
-        }
-        
-        if ($settings['openvpn_status'] == 1) {
-            $unions[] = "
-                SELECT id, name, active_count, 'openvpn' AS protocol
-                FROM open_vpns
-                WHERE status = 1
-            ";
-        }
         if ($settings['openconnect_status'] == 1) {
             $unions[] = "
                 SELECT id, name, active_count, 'openconnect' AS protocol
@@ -92,8 +71,6 @@ class DashBoardController extends Controller
             'activeUsers1hrCount' => $activeUsersCount,
             'activeUsers1hrPercentage' => $activeUsersPercentage,
             'v2rayServers' => $v2rayServers,
-            'openvpnServers' => $openvpnServers,
-            'wireguardServers' => $wireguardServers,
             'openconnectServers' => $openconnectServers,
             'totalRevenue' => $totalRevenue,
             'topServerUsers' => $topFive,

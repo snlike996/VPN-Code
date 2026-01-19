@@ -24,35 +24,10 @@
 
                     {{-- VPN Status Toggles --}}
                     <div class="col-md-4">
-                        <label for="wireguard_status" class="form-label">默认协议</label>
-                        <select name="default_protocol" class="form-select input-light">
-                            <option value="wireguard" {{ ($settings['default_protocol'] ?? 'wireguard') == 'wireguard' ? 'selected' : '' }}>Wireguard</option>
-                            <option value="v2ray" {{ ($settings['default_protocol'] ?? 'v2ray') == 'v2ray' ? 'selected' : '' }}>V2ray</option>
-                            <option value="openvpn" {{ ($settings['default_protocol'] ?? 'openvpn') == 'openvpn' ? 'selected' : '' }}>OpenVPN</option>
-                          
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="wireguard_status" class="form-label">Wireguard状态</label>
-                        <select name="wireguard_status" class="form-select input-light">
-                            <option value="1" {{ ($settings['wireguard_status'] ?? '0') == '1' ? 'selected' : '' }}>启用</option>
-                            <option value="0" {{ ($settings['wireguard_status'] ?? '0') == '0' ? 'selected' : '' }}>禁用</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
                         <label for="v2ray_status" class="form-label">V2ray状态</label>
                         <select name="v2ray_status" class="form-select input-light">
                             <option value="1" {{ ($settings['v2ray_status'] ?? '0') == '1' ? 'selected' : '' }}>启用</option>
                             <option value="0" {{ ($settings['v2ray_status'] ?? '0') == '0' ? 'selected' : '' }}>禁用</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label for="openvpn_status" class="form-label">OpenVPN状态</label>
-                        <select name="openvpn_status" class="form-select input-light">
-                            <option value="1" {{ ($settings['openvpn_status'] ?? '0') == '1' ? 'selected' : '' }}>启用</option>
-                            <option value="0" {{ ($settings['openvpn_status'] ?? '0') == '0' ? 'selected' : '' }}>禁用</option>
                         </select>
                     </div>
                 

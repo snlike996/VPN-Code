@@ -11,6 +11,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V2raySubscriptionApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,23 +32,6 @@ Route::prefix('auth')->group(function () {
     Route::post('reset-password', [UserController::class, 'resetPassword']);
     Route::post('admin/login', [AdminController::class, 'login']);
 });
-
-/* V2ray */
-Route::get('v2ray/list', [AllGetApiController::class, 'v2ray']);
-Route::get('v2ray/list/free', [AllGetApiController::class, 'v2ray_free']);
-Route::get('v2ray/list/premium', [AllGetApiController::class, 'v2ray_premium']);
-Route::get('v2ray/search', [AllGetApiController::class, 'v2ray_search']);
-
-/* OpenVpn */
-Route::get('openvpn/list', [AllGetApiController::class, 'openvpn']);
-Route::get('openvpn/list/free', [AllGetApiController::class, 'openvpn_free']);
-Route::get('openvpn/list/premium', [AllGetApiController::class, 'openvpn_premium']);
-Route::get('openvpn/search', [AllGetApiController::class, 'openvpn_search']);
-/* Wireguard */
-Route::get('wireguard/list', [AllGetApiController::class, 'wireguard']);
-Route::get('wireguard/list/free', [AllGetApiController::class, 'wireguard_free']);
-Route::get('wireguard/list/premium', [AllGetApiController::class, 'wireguard_premium']);
-Route::get('wireguard/search', [AllGetApiController::class, 'wireguard_search']);
 
 Route::get('all', [AllGetApiController::class, 'all']);
 
@@ -124,28 +108,10 @@ Route::prefix('admin')->middleware(['auth:admin'])->group(function () {
 
 Route::get('helpcenter/search', [HelpCenterController::class, 'search']);
 
-/*
-|--------------------------------------------------------------------------
-| VPN Configuration Generation Routes
-|--------------------------------------------------------------------------
-|
-| These routes handle WireGuard VPN configuration generation via SSH.
-| Protected routes require Sanctum authentication.
-|
-*/
-use App\Http\Controllers\Api\VPNConfigController;
+Route::prefix('v1')->group(function () {
+    Route::get('v2ray/countries', [V2raySubscriptionApiController::class, 'countries']);
 
-// Main VPN routes (all require authentication)
-Route::prefix('vpn')->middleware(['auth:sanctum'])->group(function () {
-    // Generate new VPN config
-    Route::post('/generate', [VPNConfigController::class, 'generate']);
-    
-    // Remove existing VPN client from server
-    Route::post('/remove-client', [VPNConfigController::class, 'removeClient']);
-    
-    // Test SSH connection to VPS
-    Route::post('/test-connection', [VPNConfigController::class, 'testConnection']);
-    
-    // List all clients on VPS
-    Route::post('/list-clients', [VPNConfigController::class, 'listClients']);
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::get('v2ray/subscription/content', [V2raySubscriptionApiController::class, 'content']);
+    });
 });

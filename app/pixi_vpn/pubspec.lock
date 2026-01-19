@@ -528,13 +528,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.0"
-  openvpn_flutter:
-    dependency: "direct main"
-    description:
-      path: openvpn_flutter
-      relative: true
-    source: path
-    version: "1.4.0+1"
   package_info_plus:
     dependency: "direct main"
     description:
@@ -687,22 +680,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.9.1"
-  process_run:
-    dependency: transitive
-    description:
-      name: process_run
-      sha256: "8d9c6198b98fbbfb511edd42e7364e24d85c163e47398919871b952dc86a423e"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.14.2"
-  pub_semver:
-    dependency: transitive
-    description:
-      name: pub_semver
-      sha256: "5bfcf68ca79ef689f8990d1160781b4bad40a3bd5e5218ad4076ddb7f4081585"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "2.2.0"
   share_plus:
     dependency: "direct main"
     description:
@@ -812,14 +789,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.4.1"
-  synchronized:
-    dependency: transitive
-    description:
-      name: synchronized
-      sha256: c254ade258ec8282947a0acbbc90b9575b4f19673533ee46f2f6e9b3aeefd7c0
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "3.4.0"
   term_glyph:
     dependency: transitive
     description:
@@ -996,13 +965,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.1.5"
-  wireguard_flutter:
-    dependency: "direct main"
-    description:
-      path: wireguard_flutter
-      relative: true
-    source: path
-    version: "0.1.0"
   xdg_directories:
     dependency: transitive
     description:

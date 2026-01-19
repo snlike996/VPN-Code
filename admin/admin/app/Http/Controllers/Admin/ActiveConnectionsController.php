@@ -4,12 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\CPU\Helpers;
 use App\Http\Controllers\Controller;
-use App\Models\OpenVpn;
 use App\Models\OpenConnect;
 use App\Models\V2ray;
-use App\Models\Wireguard;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use App\Models\AppSetting;
 
 class ActiveConnectionsController extends Controller
@@ -20,54 +17,11 @@ class ActiveConnectionsController extends Controller
             $protocolFilter = $request->input('protocol', 'all');
             $searchTerm = $request->input('search', '');
 
-            $settings = AppSetting::getValues(['wireguard_status', 'v2ray_status', 'openvpn_status', 'openconnect_status']);
+            $settings = AppSetting::getValues(['v2ray_status', 'openconnect_status']);
             // dd($settings['wireguard_status']);
 
             $connections = collect();
 
-            // Get Wireguard connections
-            if (($protocolFilter === 'all' || $protocolFilter === 'wireguard') && $settings['wireguard_status'] == 1) {
-                $wireguards = Wireguard::where('status', 1)
-                    ->when($searchTerm, function ($query) use ($searchTerm) {
-                        return $query->where(function ($q) use ($searchTerm) {
-                            $q->where('name', 'like', "%$searchTerm%")
-                                ->orWhere('link', 'like', "%$searchTerm%");
-                        });
-                    })
-                    ->get()
-                    ->map(function ($item) {
-                        return [
-                            'id' => $item->id,
-                            'name' => $item->name,
-                            'active_count' => $item->active_count,
-                            'protocol' => 'wireguard',
-                            'created_at' => $item->created_at,
-                        ];
-                    });
-                $connections = $connections->merge($wireguards);
-            }
-
-            // Get OpenVpn connections
-            if (($protocolFilter === 'all' || $protocolFilter === 'openvpn') && $settings['openvpn_status'] == 1) {
-                $openvpns = OpenVpn::where('status', 1)
-                    ->when($searchTerm, function ($query) use ($searchTerm) {
-                        return $query->where(function ($q) use ($searchTerm) {
-                            $q->where('name', 'like', "%$searchTerm%")
-                                ->orWhere('link', 'like', "%$searchTerm%");
-                        });
-                    })
-                    ->get()
-                    ->map(function ($item) {
-                        return [
-                            'id' => $item->id,
-                            'name' => $item->name,
-                            'active_count' => $item->active_count,
-                            'protocol' => 'openvpn',
-                            'created_at' => $item->created_at,
-                        ];
-                    });
-                $connections = $connections->merge($openvpns);
-            }
             if (($protocolFilter === 'all' || $protocolFilter === 'openconnect') && $settings['openconnect_status'] == 1) {
                 $openconnects = OpenConnect::where('status', 1)
                     ->when($searchTerm, function ($query) use ($searchTerm) {
@@ -136,4 +90,3 @@ class ActiveConnectionsController extends Controller
         }
     }
 }
-
