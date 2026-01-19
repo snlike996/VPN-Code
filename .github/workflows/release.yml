@@ -123,8 +123,9 @@ jobs:
             Get-ChildItem build/windows -Recurse -ErrorAction SilentlyContinue
             exit 1
           }
-          Get-ChildItem $found
-          "WIN_RELEASE_DIR=$found" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $resolved = Resolve-Path -LiteralPath $found
+          Get-ChildItem $resolved.Path
+          "WIN_RELEASE_DIR=$($resolved.Path)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Prepare x64 artifact
         working-directory: app/pixi_vpn
