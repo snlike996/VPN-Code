@@ -79,7 +79,7 @@ class WindowsSystemProxy {
       return null;
     }
     final output = result.stdout.toString();
-    final pattern = '${RegExp.escape(name)}\\s+REG_\\w+\\s+(.+)\$';
+    final pattern = '${RegExp.escape(name)}\\s+REG_\\w+\\s+(.+)\\$';
     final regex = RegExp(pattern, multiLine: true);
     final match = regex.firstMatch(output);
     if (match == null) {
