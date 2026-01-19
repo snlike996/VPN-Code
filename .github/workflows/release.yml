@@ -52,6 +52,13 @@ jobs:
       - name: Build APKs (release, split per ABI)
         run: flutter build apk --release --split-per-abi --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
 
+      - name: Rename APKs
+        run: |
+          cd build/app/outputs/flutter-apk
+          mv app-arm64-v8a-release.apk TSVPN-arm64-v8a-release.apk || true
+          mv app-armeabi-v7a-release.apk TSVPN-armeabi-v7a-release.apk || true
+          mv app-x86_64-release.apk TSVPN-x86_64-release.apk || true
+
       - name: Build AAB (release)
         run: flutter build appbundle --release --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
 
@@ -60,7 +67,7 @@ jobs:
         with:
           name: android-release
           path: |
-            app/pixi_vpn/build/app/outputs/flutter-apk/*.apk
+            app/pixi_vpn/build/app/outputs/flutter-apk/TSVPN-*-release.apk
             app/pixi_vpn/build/app/outputs/bundle/release/*.aab
 
   build_windows_release:
@@ -127,29 +134,21 @@ jobs:
           Get-ChildItem $resolved.Path
           "WIN_RELEASE_DIR=$($resolved.Path)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Prepare x64 artifact
+      - name: Stage TSVPN.exe
         working-directory: app/pixi_vpn
         shell: pwsh
         run: |
-          $target = Resolve-Path -LiteralPath "build/windows/x64/runner/Release" -ErrorAction SilentlyContinue
-          if ($null -eq $target) {
-            New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release | Out-Null
-            $target = Resolve-Path -LiteralPath "build/windows/x64/runner/Release"
+          $targetPath = "build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
+          $exePath = Join-Path $env:WIN_RELEASE_DIR "pixi_vpn.exe"
+          if (!(Test-Path $exePath)) {
+            $exePath = (Get-ChildItem $env:WIN_RELEASE_DIR -Filter *.exe | Select-Object -First 1).FullName
           }
-          $source = Resolve-Path -LiteralPath "$env:WIN_RELEASE_DIR"
-          if ($source.Path -ne $target.Path) {
-            Copy-Item -Path "$($source.Path)\*" `
-              -Destination $target.Path `
-              -Recurse -Force
+          if ([string]::IsNullOrWhiteSpace($exePath)) {
+            Write-Error "No Windows exe found in $env:WIN_RELEASE_DIR"
+            exit 1
           }
-
-      - name: Prepare portable zip
-        working-directory: app/pixi_vpn
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          $version = $env:RELEASE_VERSION
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "artifacts/TSVPN-Windows-$version-x64.zip" -Force
+          Copy-Item -Path $exePath -Destination "$targetPath/TSVPN.exe" -Force
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -166,10 +165,8 @@ jobs:
         with:
           name: windows-release
           path: |
-            app/pixi_vpn/build/windows/x64/runner/Release/**
-            app/pixi_vpn/build/windows/runner/Release/**
-            app/pixi_vpn/artifacts/*.zip
-            app/pixi_vpn/installer/windows/output/*.exe
+            app/pixi_vpn/build/windows/x64/runner/Release/TSVPN.exe
+            app/pixi_vpn/installer/output/*.exe
 
   create_release:
     runs-on: ubuntu-latest
@@ -185,5 +182,14 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body: |
+            ## 📱 Android
+            - **TSVPN-arm64-v8a-release.apk**（推荐，大多数手机）
+            - TSVPN-armeabi-v7a-release.apk
+            - TSVPN-x86_64-release.apk（模拟器）
+            - app-release.aab（Google Play）
+
+            ## 🖥 Windows
+            - **TSVPN-Setup-x64.exe**（推荐，安装版）
+            - TSVPN.exe（绿色版）
           files: dist/**
