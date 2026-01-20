@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../controller/auth_controller.dart';
 import '../../controller/v2ray_vpn_controller.dart';
 import '../../core/models/country_item.dart';
 import '../../core/connection/connection_controller.dart';
@@ -18,6 +19,7 @@ import '../../platform/windows/system_proxy.dart';
 import '../../platform/windows/tray_service.dart';
 import '../../platform/windows/privilege_helper.dart';
 import 'windows_app.dart';
+import '../../ui/shared/auth/signin_screen.dart';
 
 class WindowsHomeScreen extends StatefulWidget {
   final ConnectionController controller;
@@ -37,6 +39,7 @@ class WindowsHomeScreen extends StatefulWidget {
 
 class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     with WindowListener {
+  late final AuthController _authController;
   late final V2rayVpnController _controller;
   late final WindowsTrayService _trayService;
   CountryItem? _selectedCountry;
@@ -58,6 +61,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   @override
   void initState() {
     super.initState();
+    _authController = Get.find<AuthController>();
     _controller = Get.find<V2rayVpnController>();
     _controller.getCountries();
     _silentLaunch = widget.launchOptions.silent || widget.launchOptions.autoConnect;
@@ -378,6 +382,14 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       appBar: AppBar(
         title: const Text('TSVPN for Windows'),
         actions: [
+          IconButton(
+            tooltip: 'Login',
+            onPressed: () async {
+              await Get.to(() => const SignInScreen());
+              _controller.getCountries();
+            },
+            icon: const Icon(Icons.login),
+          ),
           IconButton(
             tooltip: 'Retest nodes',
             onPressed: _isTesting ? null : () => _runSpeedTest(force: true),

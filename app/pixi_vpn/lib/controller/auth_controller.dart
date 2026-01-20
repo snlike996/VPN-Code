@@ -245,6 +245,9 @@ class AuthController extends GetxController {
   // ================= NAVIGATION =================
 
   Future<void> _navigateToSelectedProtocol() async {
+    if (GetPlatform.isWindows) {
+      return;
+    }
     Get.offAll(() => const V2HomeScreen(), transition: Transition.leftToRight);
   }
 }
