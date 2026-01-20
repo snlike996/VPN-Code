@@ -10,7 +10,7 @@ import java.util.Properties
 
 android {
     namespace = "com.app.pixivpngold"
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = "28.1.13356709"
 
     packaging {
