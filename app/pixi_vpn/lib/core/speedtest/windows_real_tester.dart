@@ -260,7 +260,16 @@ class WindowsRealTester {
     try {
       binary = await WindowsCoreBinary.ensureCoreBinary();
     } catch (_) {
-      return null;
+      return SpeedTestResult(
+        available: false,
+        tcpMs: null,
+        tlsMs: null,
+        scoreMs: 999999,
+        jitterMs: null,
+        testedAt: now,
+        error: 'singbox_not_found',
+        exitCode: null,
+      );
     }
 
     final configDir = await _ensureTestConfigDir();
@@ -295,7 +304,9 @@ class WindowsRealTester {
 
     final latencyMs = result.latencyMs;
     final available = result.success && latencyMs != null;
-    final error = available ? null : result.error;
+    final error = available
+        ? null
+        : (result.error?.isNotEmpty == true ? result.error : 'singbox_failed');
 
     return SpeedTestResult(
       available: available,
@@ -770,17 +781,14 @@ NodeHealth _classifyHealth(SpeedTestResult result) {
     return NodeHealth.unavailable;
   }
   final latency = result.scoreMs;
-  if (latency <= 200) {
+  if (latency <= 500) {
     return NodeHealth.excellent;
   }
-  if (latency <= 500) {
+  if (latency <= 1000) {
     return NodeHealth.good;
   }
-  if (latency <= 800) {
-    return NodeHealth.fair;
-  }
   if (latency <= 1500) {
-    return NodeHealth.poor;
+    return NodeHealth.fair;
   }
   return NodeHealth.unavailable;
 }

@@ -67,6 +67,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   bool _isLoggedIn = false;
   String _userLabel = '登录';
   Timer? _testDebounce;
+  int _testRunId = 0;
 
   @override
   void initState() {
@@ -109,6 +110,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     _autoConnectTimer?.cancel();
     _notificationSubscription?.cancel();
     _configNoticeSubscription?.cancel();
+    _testRunId++;
     widget.controller.status.removeListener(_syncTrayState);
     widget.controller.status.removeListener(_handleStatusChange);
     windowManager.removeListener(this);
@@ -322,10 +324,14 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     );
   }
 
-  Future<void> _runSpeedTest({bool force = false}) async {
+  Future<void> _runSpeedTest({
+    bool force = false,
+    bool updateSelection = true,
+  }) async {
     if (_controller.vpnServers.isEmpty) {
       return;
     }
+    final runId = ++_testRunId;
     setState(() {
       _isTesting = true;
     });
@@ -338,8 +344,13 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         _controller.vpnServers,
         timeout: const Duration(seconds: 5),
       );
+      if (!mounted || runId != _testRunId) {
+        return;
+      }
       _controller.setVpnServers(sorted);
-      _selectedNode ??= NodeSelector.pickBest(sorted);
+      if (updateSelection) {
+        _selectedNode ??= NodeSelector.pickBest(sorted);
+      }
       await _syncTrayState();
     } finally {
       if (mounted) {
@@ -1178,6 +1189,20 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
             ),
           ),
           const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: _isTesting
+                ? null
+                : () => _runSpeedTest(force: true, updateSelection: false),
+            icon: _isTesting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.flash_on),
+            label: const Text('一键测速'),
+          ),
+          const SizedBox(width: 12),
           if (!_isLoggedIn)
             const Text(
               '登录后可连接节点',
@@ -1255,9 +1280,9 @@ class _HealthIndicator extends StatelessWidget {
       case NodeHealth.poor:
         return _bars(1, Colors.orange);
       case NodeHealth.fair:
-        return _bars(2, Colors.yellow);
+        return _bars(2, Colors.orange);
       case NodeHealth.good:
-        return _bars(3, Colors.lightGreen);
+        return _bars(3, Colors.yellow);
       case NodeHealth.excellent:
         return _bars(4, Colors.green);
     }
@@ -1272,6 +1297,10 @@ String _describeTestError(String? error) {
       return '握手失败';
     case 'config_error':
       return '配置错误';
+    case 'singbox_not_found':
+      return '未找到 sing-box 内核';
+    case 'singbox_failed':
+      return 'sing-box 启动失败';
     case 'latency_missing':
       return '无延迟';
     case 'unavailable':
