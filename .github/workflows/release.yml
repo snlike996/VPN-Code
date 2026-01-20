@@ -48,9 +48,6 @@ jobs:
       - name: Build APKs (release, split per ABI)
         run: flutter build apk --release --split-per-abi --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
 
-      - name: Build AAB (release)
-        run: flutter build appbundle --release --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
-
       - name: Rename Android artifacts
         run: |
           cd build/app/outputs/flutter-apk
@@ -63,9 +60,6 @@ jobs:
         run: |
           mkdir -p build/ci/android
           cp -f build/app/outputs/flutter-apk/TSVPN-*-release.apk build/ci/android/ || true
-          if [ -f build/app/outputs/bundle/release/app-release.aab ]; then
-            cp build/app/outputs/bundle/release/app-release.aab build/ci/android/TSVPN-release.aab
-          fi
           ls -la build/ci/android
 
       - name: Upload Android artifacts
