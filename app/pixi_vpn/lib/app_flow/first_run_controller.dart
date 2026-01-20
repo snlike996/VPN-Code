@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,7 @@ import 'first_run_state.dart';
 class FirstRunController extends ChangeNotifier {
   static const String completedKey = 'first_run_completed';
   static const String stageKey = 'first_run_stage';
+  static const String installFingerprintKey = 'install_fingerprint';
 
   final SharedPreferences prefs;
   final AuthController authController;
@@ -27,6 +29,7 @@ class FirstRunController extends ChangeNotifier {
   });
 
   Future<void> init() async {
+    await _syncInstallFingerprint();
     final completed = prefs.getBool(completedKey) ?? false;
     final storedStage = prefs.getString(stageKey);
     var stage = _parseStage(storedStage) ?? FirstRunStage.welcome;
@@ -45,6 +48,36 @@ class FirstRunController extends ChangeNotifier {
     }
 
     _setState(stage: stage, completed: completed);
+  }
+
+  Future<void> _syncInstallFingerprint() async {
+    if (kIsWeb || !Platform.isWindows) {
+      return;
+    }
+    final current = await _currentInstallFingerprint();
+    if (current == null) {
+      return;
+    }
+    final stored = prefs.getString(installFingerprintKey);
+    if (stored == null || stored != current) {
+      await authController.removeUserToken();
+      await prefs.setBool(completedKey, false);
+      await prefs.setString(stageKey, FirstRunStage.welcome.name);
+      await prefs.setString(installFingerprintKey, current);
+    }
+  }
+
+  Future<String?> _currentInstallFingerprint() async {
+    try {
+      final exe = File(Platform.resolvedExecutable);
+      if (!await exe.exists()) {
+        return null;
+      }
+      final stat = await exe.stat();
+      return '${exe.path}|${stat.size}|${stat.modified.millisecondsSinceEpoch}';
+    } catch (_) {
+      return null;
+    }
   }
 
   void goToWelcome() => _setStage(FirstRunStage.welcome);
