@@ -195,8 +195,8 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
           SnackBar(
             content: Text(
               node.lastError == null
-                  ? '该节点当前不可用，请稍后重试。'
-                  : '该节点当前不可用：${_describeTestError(node.lastError)}',
+                  ? '该节点当前无法连接，请稍后重试。'
+                  : '该节点当前无法连接：${_describeTestError(node.lastError)}',
             ),
           ),
         );
@@ -342,7 +342,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       }
       final sorted = await WindowsRealTester.testAndSort(
         _controller.vpnServers,
-        timeout: const Duration(seconds: 5),
+        timeout: const Duration(seconds: 8),
       );
       if (!mounted || runId != _testRunId) {
         return;
@@ -434,6 +434,10 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     }
     if (widget.controller.status.value != ConnectionStatus.idle) {
       return;
+    }
+
+    if (_silentLaunch) {
+      await Future<void>.delayed(const Duration(seconds: 6));
     }
 
     if (_controller.countries.isEmpty) {
@@ -687,7 +691,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                                   ? '该节点当前无法连接，请稍后重试'
                                   : '测速失败：$errorLabel',
                               child: const Text(
-                                '不可用',
+                                '无法连接',
                                 style: TextStyle(color: Colors.redAccent),
                               ),
                             )
@@ -1156,29 +1160,37 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   }
 
   Widget _buildConnectAction() {
+    final isConnected =
+        widget.controller.status.value == ConnectionStatus.connected;
+    final connectDisabled = _isLoggedIn && _isTesting && !isConnected;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           ElevatedButton.icon(
-            onPressed: _isLoggedIn
+            onPressed: connectDisabled
+                ? null
+                : _isLoggedIn
                 ? () async {
                     final state = widget.controller.status.value;
                     if (state == ConnectionStatus.connected) {
                       await widget.controller.disconnect(userInitiated: true);
-                    } else {
-                      if (_selectedNode == null) {
-                        final pick = NodeSelector.pickBest(_controller.vpnServers) ??
-                            _controller.vpnServers.firstWhere(
-                              (n) => n.health != NodeHealth.unavailable,
-                              orElse: () => _controller.vpnServers.first,
-                            );
-                        setState(() {
-                          _selectedNode = pick;
-                        });
-                      }
-                      await _connectSelected();
+                      return;
                     }
+                    if (_isTesting) {
+                      return;
+                    }
+                    if (_selectedNode == null) {
+                      final pick = NodeSelector.pickBest(_controller.vpnServers) ??
+                          _controller.vpnServers.firstWhere(
+                            (n) => n.health != NodeHealth.unavailable,
+                            orElse: () => _controller.vpnServers.first,
+                          );
+                      setState(() {
+                        _selectedNode = pick;
+                      });
+                    }
+                    await _connectSelected();
                   }
                 : _showLoginDialog,
             icon: const Icon(Icons.power_settings_new),
@@ -1278,9 +1290,8 @@ class _HealthIndicator extends StatelessWidget {
       case NodeHealth.unavailable:
         return const Icon(Icons.close, color: Colors.redAccent, size: 16);
       case NodeHealth.poor:
-        return _bars(1, Colors.orange);
       case NodeHealth.fair:
-        return _bars(2, Colors.orange);
+        return const Icon(Icons.close, color: Colors.redAccent, size: 16);
       case NodeHealth.good:
         return _bars(3, Colors.yellow);
       case NodeHealth.excellent:
@@ -1290,6 +1301,12 @@ class _HealthIndicator extends StatelessWidget {
 }
 
 String _describeTestError(String? error) {
+  if (error == null || error.isEmpty) {
+    return '无法建立安全连接';
+  }
+  if (error.startsWith('process_error')) {
+    return '启动失败';
+  }
   switch (error) {
     case 'timeout':
       return '超时';
@@ -1304,8 +1321,8 @@ String _describeTestError(String? error) {
     case 'latency_missing':
       return '无延迟';
     case 'unavailable':
-      return '不可用';
+      return '服务器无响应';
     default:
-      return '不可用';
+      return '无法建立安全连接';
   }
 }

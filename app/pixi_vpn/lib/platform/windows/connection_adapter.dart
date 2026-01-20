@@ -18,9 +18,10 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
       await pacServer.stop();
       _unexpectedDisconnectController.add(null);
     });
+    _noticeSubscription = vpnManager.notices.listen(_configNoticeController.add);
   }
 
-  final WindowsVpnManager vpnManager;
+  final WindowsSingBoxService vpnManager;
   final SingboxConfigService? singboxService;
   final WindowsSystemProxy systemProxy = WindowsSystemProxy();
   final PacServer pacServer = PacServer();
@@ -31,6 +32,7 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
 
   SystemProxySnapshot? _snapshot;
   StreamSubscription<void>? _exitSubscription;
+  StreamSubscription<String>? _noticeSubscription;
   final StreamController<void> _unexpectedDisconnectController =
       StreamController<void>.broadcast();
   final StreamController<String> _configNoticeController =
@@ -81,6 +83,7 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
   Future<void> dispose() async {
     await disconnect();
     await _exitSubscription?.cancel();
+    await _noticeSubscription?.cancel();
     await _unexpectedDisconnectController.close();
     await _configNoticeController.close();
   }

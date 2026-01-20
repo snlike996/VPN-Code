@@ -29,14 +29,14 @@ class WindowsApp extends StatefulWidget {
 }
 
 class _WindowsAppState extends State<WindowsApp> {
-  late final WindowsVpnManager _vpnManager;
+  late final WindowsSingBoxService _vpnManager;
   late final WindowsConnectionAdapter _adapter;
   late final ConnectionController _controller;
 
   @override
   void initState() {
     super.initState();
-    _vpnManager = WindowsVpnManager(autoRestart: false);
+    _vpnManager = WindowsSingBoxService(autoRestart: true);
     _adapter = WindowsConnectionAdapter(
       vpnManager: _vpnManager,
       singboxService: di.sl<SingboxConfigService>(),

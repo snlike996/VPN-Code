@@ -15,16 +15,18 @@ import 'vpn_config_builder.dart';
 
 enum WindowsVpnState { stopped, starting, running, stopping, failed }
 
-class WindowsVpnManager {
-  WindowsVpnManager({this.autoRestart = false});
+class WindowsSingBoxService {
+  WindowsSingBoxService({this.autoRestart = false});
 
   final bool autoRestart;
   static const int _maxRestartAttempts = 3;
-  static const Duration _restartDelay = Duration(seconds: 2);
+  static const Duration _restartBaseDelay = Duration(seconds: 2);
 
   final ValueNotifier<WindowsVpnState> state =
       ValueNotifier<WindowsVpnState>(WindowsVpnState.stopped);
   final StreamController<String> _logs = StreamController<String>.broadcast();
+  final StreamController<String> _notices =
+      StreamController<String>.broadcast();
   final StreamController<void> _unexpectedExitController =
       StreamController<void>.broadcast();
   final WindowsTunAdapter _tunAdapter = WindowsTunAdapter();
@@ -35,14 +37,20 @@ class WindowsVpnManager {
   Process? _process;
   ProxyNode? _currentNode;
   String? _currentConfigPath;
+  int? _lastProxyPort;
   bool _shouldRestart = false;
   int _restartAttempts = 0;
   bool _userInitiatedStop = false;
   IOSink? _runtimeLogSink;
 
   Stream<String> get logs => _logs.stream;
+  Stream<String> get notices => _notices.stream;
   Stream<void> get unexpectedExitStream => _unexpectedExitController.stream;
   ProxyNode? get currentNode => _currentNode;
+  WindowsVpnState get status => state.value;
+  int? get pid => _process?.pid;
+  bool get isRunning => state.value == WindowsVpnState.running;
+  bool get isCrashed => state.value == WindowsVpnState.failed;
 
   Future<void> connect(ProxyNode node, {int? localProxyPort}) async {
     if (!WindowsPrivilege.isAdmin()) {
@@ -58,6 +66,7 @@ class WindowsVpnManager {
     _userInitiatedStop = false;
     _currentNode = node;
     _currentConfigPath = null;
+    _lastProxyPort = localProxyPort;
     state.value = WindowsVpnState.starting;
 
     try {
@@ -73,6 +82,9 @@ class WindowsVpnManager {
       final ready = await _startProcess(coreFile.path, configPath);
       await _waitForReady(ready);
       state.value = WindowsVpnState.running;
+      if (_restartAttempts > 0) {
+        _notices.add('已自动重连');
+      }
       if (dnsProtectionEnabled) {
         try {
           await _dnsProtect.enable();
@@ -111,6 +123,9 @@ class WindowsVpnManager {
       final ready = await _startProcess(coreFile.path, configPath);
       await _waitForReady(ready);
       state.value = WindowsVpnState.running;
+      if (_restartAttempts > 0) {
+        _notices.add('已自动重连');
+      }
       if (dnsProtectionEnabled) {
         try {
           await _dnsProtect.enable();
@@ -152,6 +167,20 @@ class WindowsVpnManager {
     state.value = WindowsVpnState.stopped;
   }
 
+  Future<void> restart() async {
+    final node = _currentNode;
+    final configPath = _currentConfigPath;
+    if (node == null && configPath == null) {
+      return;
+    }
+    await disconnect();
+    if (configPath != null) {
+      await connectWithConfig(configPath, node: node);
+    } else if (node != null) {
+      await connect(node, localProxyPort: _lastProxyPort);
+    }
+  }
+
   Future<void> dispose() async {
     _shouldRestart = false;
     _restartAttempts = 0;
@@ -161,6 +190,7 @@ class WindowsVpnManager {
     await _runtimeLogSink?.close();
     _runtimeLogSink = null;
     await _logs.close();
+    await _notices.close();
     await _unexpectedExitController.close();
   }
 
@@ -176,19 +206,21 @@ class WindowsVpnManager {
   void _handleExit(int exitCode) {
     _process = null;
 
-    if (!_userInitiatedStop) {
-      _unexpectedExitController.add(null);
-    }
-
     if (_shouldRestart && _currentNode != null) {
       if (_restartAttempts >= _maxRestartAttempts) {
         _logs.add('VPN restart limit reached');
         state.value = WindowsVpnState.failed;
+        if (!_userInitiatedStop) {
+          _unexpectedExitController.add(null);
+        }
         return;
       }
       _restartAttempts += 1;
       _logs.add('VPN exited ($exitCode), restarting...');
-      Future<void>.delayed(_restartDelay, () async {
+      _notices.add('检测到异常，正在自动重连…');
+      final delaySeconds =
+          _restartBaseDelay.inSeconds * (1 << (_restartAttempts - 1));
+      Future<void>.delayed(Duration(seconds: delaySeconds), () async {
         if (!_shouldRestart || _currentNode == null) {
           return;
         }
@@ -210,7 +242,11 @@ class WindowsVpnManager {
         _logs.add('DNS restore failed: $e');
       });
     }
-    state.value = WindowsVpnState.stopped;
+    state.value =
+        _userInitiatedStop ? WindowsVpnState.stopped : WindowsVpnState.failed;
+    if (!_userInitiatedStop) {
+      _unexpectedExitController.add(null);
+    }
   }
 
   Future<_ProcessReady> _startProcess(String exePath, String configPath) async {
@@ -281,6 +317,11 @@ class WindowsVpnManager {
     _runtimeLogSink = logFile.openWrite(mode: FileMode.append);
     _runtimeLogSink?.writeln('--- ${DateTime.now().toIso8601String()} start ---');
   }
+}
+
+@Deprecated('Use WindowsSingBoxService instead.')
+class WindowsVpnManager extends WindowsSingBoxService {
+  WindowsVpnManager({super.autoRestart});
 }
 
 class _ProcessReady {

@@ -34,7 +34,7 @@ class SpeedTestResult {
 }
 
 class WindowsRealTester {
-  static const Duration _timeout = Duration(seconds: 5);
+  static const Duration _timeout = Duration(seconds: 8);
   static const Duration _cacheTtl = Duration(minutes: 5);
   static const int _maxConcurrency = 5;
 
@@ -336,7 +336,12 @@ class WindowsRealTester {
     final stderrBuffer = StringBuffer();
     int? exitCode;
     try {
-      final proc = await Process.start(exePath, args);
+      final proc = await Process.start(
+        exePath,
+        args,
+        workingDirectory: File(exePath).parent.path,
+        runInShell: false,
+      );
       proc.stdout.transform(utf8.decoder).listen(stdoutBuffer.write);
       proc.stderr.transform(utf8.decoder).listen(stderrBuffer.write);
       exitCode = await proc.exitCode.timeout(
@@ -732,6 +737,9 @@ class WindowsRealTester {
   }
 
   static int _compareNodes(ProxyNode a, ProxyNode b) {
+    if (a.available != b.available) {
+      return a.available ? -1 : 1;
+    }
     final aScore = a.latencyMs;
     final bScore = b.latencyMs;
     if (aScore == null && bScore == null) {
@@ -784,13 +792,10 @@ NodeHealth _classifyHealth(SpeedTestResult result) {
   if (latency <= 500) {
     return NodeHealth.excellent;
   }
-  if (latency <= 1000) {
+  if (latency <= 900) {
     return NodeHealth.good;
   }
-  if (latency <= 1500) {
-    return NodeHealth.fair;
-  }
-  return NodeHealth.unavailable;
+  return NodeHealth.poor;
 }
 
 class _HostPort {
