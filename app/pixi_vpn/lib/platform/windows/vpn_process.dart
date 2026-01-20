@@ -242,7 +242,7 @@ class WindowsVpnManager {
       throw StateError('sing-box not started');
     }
     final completed = await Future.any<bool>([
-      ready.ready.future,
+      ready.ready,
       process.exitCode.then((_) => false),
     ]).timeout(
       const Duration(seconds: 8),
