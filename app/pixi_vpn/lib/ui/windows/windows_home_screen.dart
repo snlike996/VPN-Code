@@ -296,6 +296,15 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         });
       }
     }
+    final isAdmin = await widget.adapter.vpnManager.isAdmin();
+    if (!isAdmin) {
+      if (mounted && !_silentLaunch) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请以管理员身份运行以启用 TUN')),
+        );
+      }
+      return;
+    }
     if (!_isLoggedIn) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

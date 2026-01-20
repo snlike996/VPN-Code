@@ -77,7 +77,12 @@ class ConnectionController {
     try {
       await adapter.connect(node);
       status.value = ConnectionStatus.connected;
-    } catch (_) {
+    } catch (e) {
+      if (_isAdminRequired(e)) {
+        status.value = ConnectionStatus.idle;
+        _notifications.add('需要管理员权限');
+        rethrow;
+      }
       _scheduleReconnect();
       rethrow;
     }
@@ -142,5 +147,11 @@ class ConnectionController {
 
   void updateNode(ProxyNode node) {
     _currentNode = node;
+  }
+
+  bool _isAdminRequired(Object error) {
+    final lower = error.toString().toLowerCase();
+    return lower.contains('admin_required') ||
+        lower.contains('administrator privileges required');
   }
 }

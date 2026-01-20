@@ -358,17 +358,22 @@ class _SingBoxWorker {
       _sendIgnored(id);
       return;
     }
-    _setState(SingBoxWorkerState.running);
-    _userInitiatedStop = false;
-    _restartAttempts = 0;
-    _dnsProtectionEnabled = message['dnsProtectionEnabled'] == true;
-    _proxySettings = ProxySettings.fromJson(
-      Map<String, dynamic>.from(message['proxySettings'] as Map? ?? {}),
-    );
-
     await _initWorkerLog();
     log('start_node requested');
     try {
+      if (!WindowsAdminCheck.isAdmin()) {
+        log('admin_required');
+        _setState(SingBoxWorkerState.idle);
+        _sendResponse(id, {'ok': false, 'error': 'admin_required'});
+        return;
+      }
+      _setState(SingBoxWorkerState.running);
+      _userInitiatedStop = false;
+      _restartAttempts = 0;
+      _dnsProtectionEnabled = message['dnsProtectionEnabled'] == true;
+      _proxySettings = ProxySettings.fromJson(
+        Map<String, dynamic>.from(message['proxySettings'] as Map? ?? {}),
+      );
       await _tunAdapter.ensureReady();
       await _firewall.applyRules();
       final configPath = await _writeNodeConfig(
@@ -408,17 +413,22 @@ class _SingBoxWorker {
       _sendIgnored(id);
       return;
     }
-    _setState(SingBoxWorkerState.running);
-    _userInitiatedStop = false;
-    _restartAttempts = 0;
-    _dnsProtectionEnabled = message['dnsProtectionEnabled'] == true;
-    _proxySettings = ProxySettings.fromJson(
-      Map<String, dynamic>.from(message['proxySettings'] as Map? ?? {}),
-    );
-
     await _initWorkerLog();
     log('start_config requested');
     try {
+      if (!WindowsAdminCheck.isAdmin()) {
+        log('admin_required');
+        _setState(SingBoxWorkerState.idle);
+        _sendResponse(id, {'ok': false, 'error': 'admin_required'});
+        return;
+      }
+      _setState(SingBoxWorkerState.running);
+      _userInitiatedStop = false;
+      _restartAttempts = 0;
+      _dnsProtectionEnabled = message['dnsProtectionEnabled'] == true;
+      _proxySettings = ProxySettings.fromJson(
+        Map<String, dynamic>.from(message['proxySettings'] as Map? ?? {}),
+      );
       await _tunAdapter.ensureReady();
       await _firewall.applyRules();
       final content = message['configContent']?.toString() ?? '';
