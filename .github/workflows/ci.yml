@@ -1,14 +1,15 @@
-name: Push Release
+name: CI
 
 on:
   push:
     branches: ["main", "master"]
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: push-release
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -189,56 +190,3 @@ jobs:
         with:
           name: windows-release
           path: app/pixi_vpn/build/ci/windows/*.exe
-
-  publish_release:
-    runs-on: ubuntu-latest
-    needs: [build_android, build_windows]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Prepare release notes
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          AUTHOR=$(git log -1 --pretty=%an)
-          TIME=$(git log -1 --pretty=%cI)
-          cat <<EOF > release_notes.md
-          ## 📦 自动构建
-          - Commit: ${SHORT_SHA}
-          - Message: ${COMMIT_MSG}
-          - Author: ${AUTHOR}
-          - Time: ${TIME}
-          EOF
-
-      - name: Delete existing latest release (if any)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete latest -y --cleanup-tag || true
-
-      - name: Create latest release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          shopt -s nullglob
-          files=()
-          for f in dist/android-release/*.apk dist/windows-release/*.exe; do
-            if [ -f "$f" ]; then
-              files+=("$f")
-            fi
-          done
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No release assets found." >&2
-            exit 1
-          fi
-          gh release create latest \
-            "${files[@]}" \
-            --title "Latest Build" \
-            --notes-file release_notes.md \
-            --latest
