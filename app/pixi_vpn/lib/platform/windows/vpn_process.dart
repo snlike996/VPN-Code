@@ -38,6 +38,7 @@ class WindowsVpnManager {
   bool _shouldRestart = false;
   int _restartAttempts = 0;
   bool _userInitiatedStop = false;
+  IOSink? _runtimeLogSink;
 
   Stream<String> get logs => _logs.stream;
   Stream<void> get unexpectedExitStream => _unexpectedExitController.stream;
@@ -69,23 +70,8 @@ class WindowsVpnManager {
       );
       final configPath = await _writeConfig(config);
 
-      _process = await Process.start(
-        coreFile.path,
-        ['run', '-c', configPath],
-        workingDirectory: coreFile.parent.path,
-        runInShell: false,
-      );
-
-      _process?.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(_logs.add);
-      _process?.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(_logs.add);
-
-      _process?.exitCode.then(_handleExit);
+      final ready = await _startProcess(coreFile.path, configPath);
+      await _waitForReady(ready);
       state.value = WindowsVpnState.running;
       if (dnsProtectionEnabled) {
         try {
@@ -122,23 +108,8 @@ class WindowsVpnManager {
       await _firewall.applyRules();
       final coreFile = await WindowsCoreBinary.ensureCoreBinary();
 
-      _process = await Process.start(
-        coreFile.path,
-        ['run', '-c', configPath],
-        workingDirectory: coreFile.parent.path,
-        runInShell: false,
-      );
-
-      _process?.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(_logs.add);
-      _process?.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen(_logs.add);
-
-      _process?.exitCode.then(_handleExit);
+      final ready = await _startProcess(coreFile.path, configPath);
+      await _waitForReady(ready);
       state.value = WindowsVpnState.running;
       if (dnsProtectionEnabled) {
         try {
@@ -167,6 +138,9 @@ class WindowsVpnManager {
     state.value = WindowsVpnState.stopping;
     _process?.kill(ProcessSignal.sigterm);
     _process = null;
+    await _runtimeLogSink?.flush();
+    await _runtimeLogSink?.close();
+    _runtimeLogSink = null;
     if (dnsProtectionEnabled) {
       try {
         await _dnsProtect.restore();
@@ -183,6 +157,9 @@ class WindowsVpnManager {
     _restartAttempts = 0;
     _process?.kill(ProcessSignal.sigterm);
     _process = null;
+    await _runtimeLogSink?.flush();
+    await _runtimeLogSink?.close();
+    _runtimeLogSink = null;
     await _logs.close();
     await _unexpectedExitController.close();
   }
@@ -234,5 +211,86 @@ class WindowsVpnManager {
       });
     }
     state.value = WindowsVpnState.stopped;
+  }
+
+  Future<_ProcessReady> _startProcess(String exePath, String configPath) async {
+    await _initRuntimeLogger();
+    _process = await Process.start(
+      exePath,
+      ['run', '-c', configPath],
+      workingDirectory: File(exePath).parent.path,
+      runInShell: false,
+    );
+
+    final ready = _ProcessReady();
+    _process?.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) => _handleLogLine(line, ready));
+    _process?.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) => _handleLogLine(line, ready));
+
+    _process?.exitCode.then(_handleExit);
+    return ready;
+  }
+
+  Future<void> _waitForReady(_ProcessReady ready) async {
+    final process = _process;
+    if (process == null) {
+      throw StateError('sing-box not started');
+    }
+    final completed = await Future.any<bool>([
+      ready.ready.future,
+      process.exitCode.then((_) => false),
+    ]).timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => false,
+    );
+    if (!completed) {
+      process.kill();
+      throw StateError('sing-box not ready: check logs/runtime.log');
+    }
+  }
+
+  void _handleLogLine(String line, _ProcessReady ready) {
+    _logs.add(line);
+    _runtimeLogSink?.writeln(line);
+    if (ready.isCompleted) {
+      return;
+    }
+    final lower = line.toLowerCase();
+    if (lower.contains('started') ||
+        lower.contains('tun') && lower.contains('listen') ||
+        lower.contains('inbound') && lower.contains('listening')) {
+      ready.complete();
+    }
+  }
+
+  Future<void> _initRuntimeLogger() async {
+    if (_runtimeLogSink != null) {
+      return;
+    }
+    final supportDir = await getApplicationSupportDirectory();
+    final logDir = Directory('${supportDir.path}\\logs');
+    if (!await logDir.exists()) {
+      await logDir.create(recursive: true);
+    }
+    final logFile = File('${logDir.path}\\runtime.log');
+    _runtimeLogSink = logFile.openWrite(mode: FileMode.append);
+    _runtimeLogSink?.writeln('--- ${DateTime.now().toIso8601String()} start ---');
+  }
+}
+
+class _ProcessReady {
+  final Completer<bool> _completer = Completer<bool>();
+  bool get isCompleted => _completer.isCompleted;
+  Future<bool> get ready => _completer.future;
+
+  void complete() {
+    if (!_completer.isCompleted) {
+      _completer.complete(true);
+    }
   }
 }

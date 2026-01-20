@@ -15,10 +15,11 @@ class WindowsVpnConfigBuilder {
       {
         'type': 'tun',
         'tag': 'tun-in',
-        'interface_name': 'tsvpn',
+        'interface_name': 'tsvpn0',
         'inet4_address': '172.19.0.1/30',
         'auto_route': true,
         'strict_route': true,
+        'sniff': true,
       },
     ];
 
@@ -33,7 +34,19 @@ class WindowsVpnConfigBuilder {
 
     final config = <String, dynamic>{
       'log': {
-        'level': 'warn',
+        'level': 'info',
+      },
+      'dns': {
+        'servers': [
+          {
+            'address': '1.1.1.1',
+            'detour': 'proxy',
+          },
+          {
+            'address': '8.8.8.8',
+            'detour': 'proxy',
+          },
+        ],
       },
       'inbounds': inbounds,
       'outbounds': [
@@ -71,7 +84,7 @@ class WindowsVpnConfigBuilder {
     final outbound = _buildOutbound(parsed);
     final config = <String, dynamic>{
       'log': {
-        'level': 'warn',
+        'level': 'info',
       },
       'outbounds': [
         outbound,

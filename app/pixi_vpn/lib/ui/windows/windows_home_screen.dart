@@ -212,8 +212,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         return;
       }
       if (!_silentLaunch) {
+        final msg = e.toString();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('连接失败，请稍后重试。')),
+          SnackBar(content: Text('连接失败：$msg')),
         );
       }
     }
