@@ -59,6 +59,16 @@ class DioClient {
         },
       );
     }
+    if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      dio!.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final httpClient = HttpClient();
+          // Avoid inheriting stale system proxy settings on desktop.
+          httpClient.findProxy = (_) => 'DIRECT';
+          return httpClient;
+        },
+      );
+    }
 
     dio!
       ..options.baseUrl = baseUrl

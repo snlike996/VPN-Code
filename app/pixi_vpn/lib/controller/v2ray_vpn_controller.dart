@@ -42,6 +42,17 @@ class V2rayVpnController extends GetxController {
 
     _isLoadingCountries = false;
 
+    if (apiResponse.response != null) {
+      final status = apiResponse.response!.statusCode;
+      final data = apiResponse.response!.data;
+      final body = data == null ? '' : data.toString();
+      final preview = body.length > 100 ? body.substring(0, 100) : body;
+      log('Countries response status=$status length=${body.length} preview="$preview"');
+    } else {
+      final err = apiResponse.error?.toString() ?? 'unknown error';
+      log('Countries request failed: $err');
+    }
+
     if (apiResponse.response != null &&
         apiResponse.response!.statusCode == 200 &&
         apiResponse.response!.data != null) {
@@ -59,8 +70,12 @@ class V2rayVpnController extends GetxController {
       }
     } else {
       _countries = [];
-      countriesError = '国家列表加载失败';
-      log('Failed to load countries. Status: ${apiResponse.response?.statusCode}');
+      final status = apiResponse.response?.statusCode;
+      final err = apiResponse.error?.toString();
+      countriesError = err == null
+          ? '国家列表加载失败'
+          : '国家列表加载失败: $err';
+      log('Failed to load countries. Status: $status Error: $err');
     }
 
     update();
