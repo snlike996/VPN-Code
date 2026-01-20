@@ -1,5 +1,5 @@
 #define AppName "TSVPN"
-#define AppExeName "pixi_vpn.exe"
+#define AppExeName "TSVPN.exe"
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"

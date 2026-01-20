@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "1072818978126",
-    "project_id": "pixi-vpn",
-    "storage_bucket": "pixi-vpn.firebasestorage.app"
+    "project_number": "142522140750",
+    "project_id": "tsvpn-c4ec4",
+    "storage_bucket": "tsvpn-c4ec4.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1072818978126:android:07af452f1c289523c0721f",
+        "mobilesdk_app_id": "1:142522140750:android:e5d3aee307051046d6db1f",
         "android_client_info": {
-          "package_name": "com.app.pixivpngold"
+          "package_name": "com.dom.tsvpn"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyANMbcolmXZNlsKy8Ls8NWXcomicPozFy8"
+          "current_key": "AIzaSyChfL0G1vWQiTHmUZlEnLgfhfTaVolaZcQ"
         }
       ],
       "services": {

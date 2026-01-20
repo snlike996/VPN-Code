@@ -48,6 +48,9 @@ jobs:
       - name: Build APKs (release, split per ABI)
         run: flutter build apk --release --split-per-abi --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
 
+      - name: Build AAB (release)
+        run: flutter build appbundle --release --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
+
       - name: Rename Android artifacts
         run: |
           cd build/app/outputs/flutter-apk
@@ -60,6 +63,9 @@ jobs:
         run: |
           mkdir -p build/ci/android
           cp -f build/app/outputs/flutter-apk/TSVPN-*-release.apk build/ci/android/ || true
+          if [ -f build/app/outputs/bundle/release/app-release.aab ]; then
+            cp build/app/outputs/bundle/release/app-release.aab build/ci/android/TSVPN-release.aab
+          fi
           ls -la build/ci/android
 
       - name: Upload Android artifacts
@@ -135,7 +141,7 @@ jobs:
         run: |
           $targetPath = "build/ci/windows"
           New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
-          $exePath = Join-Path $env:WIN_RELEASE_DIR "pixi_vpn.exe"
+          $exePath = Join-Path $env:WIN_RELEASE_DIR "TSVPN.exe"
           if (!(Test-Path $exePath)) {
             $exePath = (Get-ChildItem $env:WIN_RELEASE_DIR -Filter *.exe | Select-Object -First 1).FullName
           }
@@ -154,7 +160,7 @@ jobs:
             exit 0
           }
           choco install innosetup -y
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$env:RELEASE_VERSION /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=pixi_vpn.exe
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$env:RELEASE_VERSION /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=TSVPN.exe
           if (Test-Path "installer/output") {
             $installer = Get-ChildItem installer/output -Filter *.exe | Select-Object -First 1
             if ($null -ne $installer) {
@@ -191,6 +197,7 @@ jobs:
           * TSVPN-arm64-v8a-release.apk（推荐，大多数手机）
           * TSVPN-armeabi-v7a-release.apk
           * TSVPN-x86_64-release.apk（模拟器）
+          * TSVPN-release.aab（Google Play）
 
           🖥 Windows
 
@@ -206,5 +213,6 @@ jobs:
           body_path: release_notes.md
           files: |
             dist/android-release/TSVPN-*-release.apk
+            dist/android-release/TSVPN-release.aab
             dist/windows-release/TSVPN-Setup-x64.exe
             dist/windows-release/TSVPN.exe

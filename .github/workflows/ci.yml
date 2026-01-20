@@ -47,6 +47,9 @@ jobs:
       - name: Build APKs (release, split per ABI)
         run: flutter build apk --release --split-per-abi --verbose
 
+      - name: Build AAB (release)
+        run: flutter build appbundle --release --verbose
+
       - name: Rename APKs
         run: |
           cd build/app/outputs/flutter-apk
@@ -62,13 +65,16 @@ jobs:
               cp "$f" build/ci/android/
             fi
           done
+          if [ -f build/app/outputs/bundle/release/app-release.aab ]; then
+            cp build/app/outputs/bundle/release/app-release.aab build/ci/android/TSVPN-release.aab
+          fi
           ls -la build/ci/android
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-release
-          path: app/pixi_vpn/build/ci/android/*.apk
+          path: app/pixi_vpn/build/ci/android/*
 
   build_windows:
     runs-on: windows-latest
@@ -131,7 +137,7 @@ jobs:
         run: |
           $targetPath = "build/ci/windows"
           New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
-          $exePath = Join-Path $env:WIN_RELEASE_DIR "pixi_vpn.exe"
+          $exePath = Join-Path $env:WIN_RELEASE_DIR "TSVPN.exe"
           if (!(Test-Path $exePath)) {
             $exePath = (Get-ChildItem $env:WIN_RELEASE_DIR -Filter *.exe | Select-Object -First 1).FullName
           }
@@ -180,7 +186,7 @@ jobs:
           }
           choco install innosetup -y
           $version = "0.0.0.$env:GITHUB_RUN_NUMBER"
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=pixi_vpn.exe
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/windows/tsvpn.iss /DAppVersion=$version /DPlatform=x64 /DBuildDir=$env:WIN_RELEASE_DIR /DAppExeName=TSVPN.exe
           if (Test-Path "installer/output") {
             Copy-Item -Path installer/output/*.exe -Destination build/ci/windows/ -Force
           }

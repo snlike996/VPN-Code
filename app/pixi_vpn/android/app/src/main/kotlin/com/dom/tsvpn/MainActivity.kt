@@ -1,4 +1,4 @@
-package com.app.pixivpngold
+package com.dom.tsvpn
 
 import io.flutter.embedding.android.FlutterActivity
 

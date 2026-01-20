@@ -1,6 +1,6 @@
 {
-    "name": "pixi_vpn",
-    "short_name": "pixi_vpn",
+    "name": "TSVPN",
+    "short_name": "TSVPN",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
