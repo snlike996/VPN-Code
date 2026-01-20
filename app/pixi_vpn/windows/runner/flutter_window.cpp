@@ -4,6 +4,7 @@
 
 #include <wininet.h>
 
+#include "crash_handler.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "utils.h"
 
@@ -38,23 +39,28 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) {
-        if (call.method_name() == "refreshInternetSettings") {
-          InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr,
-                            0);
-          InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
-          result->Success(true);
-          return;
-        }
-        if (call.method_name() == "getStartupArgs") {
-          auto args = GetCommandLineArguments();
-          flutter::EncodableList list;
-          for (const auto& arg : args) {
-            list.emplace_back(arg);
+        try {
+          if (call.method_name() == "refreshInternetSettings") {
+            InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr,
+                              0);
+            InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+            result->Success(true);
+            return;
           }
-          result->Success(list);
-          return;
+          if (call.method_name() == "getStartupArgs") {
+            auto args = GetCommandLineArguments();
+            flutter::EncodableList list;
+            for (const auto& arg : args) {
+              list.emplace_back(arg);
+            }
+            result->Success(list);
+            return;
+          }
+          result->NotImplemented();
+        } catch (...) {
+          LogCrashMessage(L"MethodChannel", L"Unhandled exception");
+          result->Error("crash", "Unhandled exception in method handler");
         }
-        result->NotImplemented();
       });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -93,21 +99,27 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // Give Flutter, including plugins, an opportunity to handle window messages.
-  if (flutter_controller_) {
-    std::optional<LRESULT> result =
-        flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,
-                                                      lparam);
-    if (result) {
-      return *result;
+  try {
+    // Give Flutter, including plugins, an opportunity to handle window messages.
+    if (flutter_controller_) {
+      std::optional<LRESULT> result =
+          flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,
+                                                        lparam);
+      if (result) {
+        return *result;
+      }
     }
-  }
 
-  switch (message) {
-    case WM_FONTCHANGE:
-      flutter_controller_->engine()->ReloadSystemFonts();
-      break;
-  }
+    switch (message) {
+      case WM_FONTCHANGE:
+        flutter_controller_->engine()->ReloadSystemFonts();
+        break;
+    }
 
-  return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+  } catch (...) {
+    LogCrashMessage(L"FlutterWindow::MessageHandler",
+                    L"Unhandled exception");
+    return DefWindowProc(hwnd, message, wparam, lparam);
+  }
 }

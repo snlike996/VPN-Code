@@ -3,6 +3,7 @@
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
+#include "crash_handler.h"
 #include "resource.h"
 
 namespace {
@@ -158,19 +159,24 @@ LRESULT CALLBACK Win32Window::WndProc(HWND const window,
                                       UINT const message,
                                       WPARAM const wparam,
                                       LPARAM const lparam) noexcept {
-  if (message == WM_NCCREATE) {
-    auto window_struct = reinterpret_cast<CREATESTRUCT*>(lparam);
-    SetWindowLongPtr(window, GWLP_USERDATA,
-                     reinterpret_cast<LONG_PTR>(window_struct->lpCreateParams));
+  try {
+    if (message == WM_NCCREATE) {
+      auto window_struct = reinterpret_cast<CREATESTRUCT*>(lparam);
+      SetWindowLongPtr(window, GWLP_USERDATA,
+                       reinterpret_cast<LONG_PTR>(window_struct->lpCreateParams));
 
-    auto that = static_cast<Win32Window*>(window_struct->lpCreateParams);
-    EnableFullDpiSupportIfAvailable(window);
-    that->window_handle_ = window;
-  } else if (Win32Window* that = GetThisFromHandle(window)) {
-    return that->MessageHandler(window, message, wparam, lparam);
+      auto that = static_cast<Win32Window*>(window_struct->lpCreateParams);
+      EnableFullDpiSupportIfAvailable(window);
+      that->window_handle_ = window;
+    } else if (Win32Window* that = GetThisFromHandle(window)) {
+      return that->MessageHandler(window, message, wparam, lparam);
+    }
+
+    return DefWindowProc(window, message, wparam, lparam);
+  } catch (...) {
+    LogCrashMessage(L"Win32Window::WndProc", L"Unhandled exception");
+    return DefWindowProc(window, message, wparam, lparam);
   }
-
-  return DefWindowProc(window, message, wparam, lparam);
 }
 
 LRESULT
@@ -178,47 +184,52 @@ Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
-  switch (message) {
-    case WM_DESTROY:
-      window_handle_ = nullptr;
-      Destroy();
-      if (quit_on_close_) {
-        PostQuitMessage(0);
+  try {
+    switch (message) {
+      case WM_DESTROY:
+        window_handle_ = nullptr;
+        Destroy();
+        if (quit_on_close_) {
+          PostQuitMessage(0);
+        }
+        return 0;
+
+      case WM_DPICHANGED: {
+        auto newRectSize = reinterpret_cast<RECT*>(lparam);
+        LONG newWidth = newRectSize->right - newRectSize->left;
+        LONG newHeight = newRectSize->bottom - newRectSize->top;
+
+        SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
+                     newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+
+        return 0;
       }
-      return 0;
+      case WM_SIZE: {
+        RECT rect = GetClientArea();
+        if (child_content_ != nullptr) {
+          // Size and position the child window.
+          MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
+                     rect.bottom - rect.top, TRUE);
+        }
+        return 0;
+      }
 
-    case WM_DPICHANGED: {
-      auto newRectSize = reinterpret_cast<RECT*>(lparam);
-      LONG newWidth = newRectSize->right - newRectSize->left;
-      LONG newHeight = newRectSize->bottom - newRectSize->top;
+      case WM_ACTIVATE:
+        if (child_content_ != nullptr) {
+          SetFocus(child_content_);
+        }
+        return 0;
 
-      SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
-                   newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
-
-      return 0;
+      case WM_DWMCOLORIZATIONCOLORCHANGED:
+        UpdateTheme(hwnd);
+        return 0;
     }
-    case WM_SIZE: {
-      RECT rect = GetClientArea();
-      if (child_content_ != nullptr) {
-        // Size and position the child window.
-        MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
-                   rect.bottom - rect.top, TRUE);
-      }
-      return 0;
-    }
 
-    case WM_ACTIVATE:
-      if (child_content_ != nullptr) {
-        SetFocus(child_content_);
-      }
-      return 0;
-
-    case WM_DWMCOLORIZATIONCOLORCHANGED:
-      UpdateTheme(hwnd);
-      return 0;
+    return DefWindowProc(window_handle_, message, wparam, lparam);
+  } catch (...) {
+    LogCrashMessage(L"Win32Window::MessageHandler", L"Unhandled exception");
+    return DefWindowProc(hwnd, message, wparam, lparam);
   }
-
-  return DefWindowProc(window_handle_, message, wparam, lparam);
 }
 
 void Win32Window::Destroy() {
