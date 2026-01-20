@@ -1218,6 +1218,27 @@ class _HealthIndicator extends StatelessWidget {
 
   const _HealthIndicator({required this.node});
 
+  Widget _bars(int level, Color color) {
+    const width = 4.0;
+    const spacing = 2.0;
+    final heights = [6.0, 9.0, 12.0, 15.0];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(4, (index) {
+        final active = index < level;
+        return Container(
+          width: width,
+          height: heights[index],
+          margin: EdgeInsets.only(right: index == 3 ? 0 : spacing),
+          decoration: BoxDecoration(
+            color: active ? color : color.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     switch (node.health) {
@@ -1228,17 +1249,17 @@ class _HealthIndicator extends StatelessWidget {
           child: CircularProgressIndicator(strokeWidth: 2),
         );
       case NodeHealth.unknown:
-        return const Text('—', style: TextStyle(color: Colors.grey));
+        return _bars(0, Colors.grey);
       case NodeHealth.unavailable:
-        return const Icon(Icons.signal_cellular_off, color: Colors.redAccent);
+        return const Icon(Icons.close, color: Colors.redAccent, size: 16);
       case NodeHealth.poor:
-        return const Icon(Icons.signal_cellular_1_bar, color: Colors.orange);
+        return _bars(1, Colors.orange);
       case NodeHealth.fair:
-        return const Icon(Icons.signal_cellular_2_bar, color: Colors.yellow);
+        return _bars(2, Colors.yellow);
       case NodeHealth.good:
-        return const Icon(Icons.signal_cellular_3_bar, color: Colors.lightGreen);
+        return _bars(3, Colors.lightGreen);
       case NodeHealth.excellent:
-        return const Icon(Icons.signal_cellular_4_bar, color: Colors.green);
+        return _bars(4, Colors.green);
     }
   }
 }
