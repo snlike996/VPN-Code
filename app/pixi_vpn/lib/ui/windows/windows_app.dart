@@ -12,10 +12,14 @@ import '../../platform/windows/vpn_process.dart';
 class WindowsLaunchOptions {
   final bool silent;
   final bool autoConnect;
+  final bool noTray;
+  final bool noCallbacks;
 
   const WindowsLaunchOptions({
     required this.silent,
     required this.autoConnect,
+    required this.noTray,
+    required this.noCallbacks,
   });
 }
 

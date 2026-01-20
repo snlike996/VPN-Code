@@ -57,6 +57,8 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   String _autoConnectCountryMode = 'last';
   String? _fixedCountryCode;
   bool _silentLaunch = false;
+  bool _noTray = false;
+  bool _noCallbacks = false;
   Timer? _autoConnectTimer;
   StreamSubscription<String>? _notificationSubscription;
   StreamSubscription<String>? _configNoticeSubscription;
@@ -78,22 +80,28 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     _controller.getCountries();
     _refreshAuthState();
     _silentLaunch = widget.launchOptions.silent || widget.launchOptions.autoConnect;
+    _noTray = widget.launchOptions.noTray;
+    _noCallbacks = widget.launchOptions.noCallbacks;
 
     _trayService = WindowsTrayService();
-    Future<void>.microtask(_trayService.init);
-    _trayActionSubscription = _trayService.actions.listen(_handleTrayAction);
+    if (!_noTray) {
+      Future<void>.microtask(_trayService.init);
+      _trayActionSubscription = _trayService.actions.listen(_handleTrayAction);
+    }
 
     windowManager.addListener(this);
     windowManager.setPreventClose(true);
 
     widget.controller.status.addListener(_syncTrayState);
     widget.controller.status.addListener(_handleStatusChange);
-    _notificationSubscription =
-        widget.controller.notifications.listen(_handleNotification);
-    _configNoticeSubscription =
-        widget.adapter.configNotices.listen(_handleConfigNotice);
-    _runtimeLogSubscription =
-        widget.adapter.vpnManager.logs.listen(_handleRuntimeLog);
+    if (!_noCallbacks) {
+      _notificationSubscription =
+          widget.controller.notifications.listen(_handleNotification);
+      _configNoticeSubscription =
+          widget.adapter.configNotices.listen(_handleConfigNotice);
+      _runtimeLogSubscription =
+          widget.adapter.vpnManager.logs.listen(_handleRuntimeLog);
+    }
     _loadSettings();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -511,6 +519,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   }
 
   Future<void> _syncTrayState() async {
+    if (_noTray) {
+      return;
+    }
     final nodeName = _selectedNode?.displayName;
     final toolTip = widget.controller.status.value == ConnectionStatus.connected
         ? (nodeName == null ? 'TSVPN 已连接' : 'TSVPN 已连接 · $nodeName')
@@ -524,6 +535,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   }
 
   Future<void> _handleNotification(String message) async {
+    if (_noCallbacks) {
+      return;
+    }
     if (message.contains('网络中断')) {
       final best = NodeSelector.pickBest(_controller.vpnServers);
       if (best != null && best.id != _selectedNode?.id) {
@@ -961,6 +975,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   }
 
   Future<void> _showTrayHintIfNeeded() async {
+    if (_noTray) {
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final seen = prefs.getBool('win_seen_tray_hint') ?? false;
     if (seen) {

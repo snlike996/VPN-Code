@@ -13,6 +13,8 @@ Future<void> bootstrap() async {
   final args = await WindowsStartupArgs.load();
   final silent = args.contains('--silent');
   final autoConnect = args.contains('--autoconnect');
+  final noTray = args.contains('--no-tray');
+  final noCallbacks = args.contains('--no-callbacks');
   const windowOptions = WindowOptions(
     size: Size(1100, 720),
     center: true,
@@ -32,6 +34,8 @@ Future<void> bootstrap() async {
     launchOptions: WindowsLaunchOptions(
       silent: silent,
       autoConnect: autoConnect,
+      noTray: noTray,
+      noCallbacks: noCallbacks,
     ),
   ));
 }
