@@ -65,6 +65,15 @@ class DioClient {
           final httpClient = HttpClient();
           // Avoid inheriting stale system proxy settings on desktop.
           httpClient.findProxy = (_) => 'DIRECT';
+          // Allow pinned certificates on desktop as well (fallback for non-standard chains).
+          httpClient.badCertificateCallback =
+              (X509Certificate cert, String host, int port) {
+            final sha256 = sha256convert(cert.der);
+            if (kDebugMode) {
+              print('Certificate SHA256: $sha256');
+            }
+            return allowedSha256Fingerprints.contains(sha256);
+          };
           return httpClient;
         },
       );

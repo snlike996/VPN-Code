@@ -49,9 +49,11 @@ class ApiErrorHandler {
               errorDescription = "Send timeout with server";
               break;
             case DioExceptionType.badCertificate:
-              // TODO: Handle this case.
+              errorDescription = "SSL certificate error";
+              break;
             case DioExceptionType.connectionError:
-              // TODO: Handle this case.
+              errorDescription = error.message ?? "Connection error";
+              break;
           }
         } else {
           errorDescription = "Unexpected error occurred";
