@@ -7,6 +7,7 @@ class AppStrings{
   //API ENDPOINTS
   static const String v2rayCountriesUrl = "/api/v1/v2ray/countries";
   static const String v2raySubscriptionContentUrl = "/api/v1/v2ray/subscription/content";
+  static const String singboxConfigsUrl = "/api/v1/singbox/configs";
   static const String helpCenterUrl = "/api/helpcenter/search";
   static const String loginUrl = "/api/auth/user/login";
   static const String registerUrl = "/api/auth/user/register";

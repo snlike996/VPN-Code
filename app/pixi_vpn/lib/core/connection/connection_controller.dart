@@ -29,11 +29,13 @@ class ConnectionController {
 
     networkMonitor.statusStream.listen((available) {
       _networkAvailable = available;
+      networkAvailable.value = available;
       if (!available) {
         if (status.value == ConnectionStatus.connected ||
             status.value == ConnectionStatus.starting) {
           status.value = ConnectionStatus.reconnecting;
           _pendingReconnect = true;
+          _notifications.add('网络中断，等待恢复…');
           adapter.disconnect();
         }
         return;
@@ -50,6 +52,7 @@ class ConnectionController {
 
   final ValueNotifier<ConnectionStatus> status =
       ValueNotifier<ConnectionStatus>(ConnectionStatus.idle);
+  final ValueNotifier<bool> networkAvailable = ValueNotifier<bool>(true);
   final StreamController<String> _notifications =
       StreamController<String>.broadcast();
 
@@ -97,6 +100,7 @@ class ConnectionController {
     await networkMonitor.dispose();
     await adapter.dispose();
     status.dispose();
+    networkAvailable.dispose();
     await _notifications.close();
   }
 
@@ -107,14 +111,17 @@ class ConnectionController {
     if (!_networkAvailable) {
       _pendingReconnect = true;
       status.value = ConnectionStatus.reconnecting;
+      _notifications.add('网络中断，等待恢复…');
       return;
     }
 
     status.value = ConnectionStatus.reconnecting;
     _attempt += 1;
     final delaySeconds = immediate ? 0 : min(30, 1 << (_attempt - 1));
-    if (_attempt % 5 == 0) {
-      _notifications.add('Reconnecting (attempt $_attempt)');
+    if (_attempt == 1) {
+      _notifications.add('网络波动，正在重连…');
+    } else if (_attempt % 2 == 0) {
+      _notifications.add('正在重连（第$_attempt次）');
     }
 
     _reconnectTimer?.cancel();
@@ -131,5 +138,9 @@ class ConnectionController {
         _scheduleReconnect();
       }
     });
+  }
+
+  void updateNode(ProxyNode node) {
+    _currentNode = node;
   }
 }

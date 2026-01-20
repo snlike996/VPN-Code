@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../app_flow/app_flow_root.dart';
 import '../../core/connection/connection_controller.dart';
 import '../../core/connection/network_monitor.dart';
+import '../../core/singbox/singbox_config_service.dart';
+import '../../di_container.dart' as di;
 import '../../platform/windows/connection_adapter.dart';
 import '../../platform/windows/vpn_process.dart';
 
@@ -35,7 +37,10 @@ class _WindowsAppState extends State<WindowsApp> {
   void initState() {
     super.initState();
     _vpnManager = WindowsVpnManager(autoRestart: false);
-    _adapter = WindowsConnectionAdapter(vpnManager: _vpnManager);
+    _adapter = WindowsConnectionAdapter(
+      vpnManager: _vpnManager,
+      singboxService: di.sl<SingboxConfigService>(),
+    );
     _controller = ConnectionController(
       adapter: _adapter,
       networkMonitor: NetworkMonitor(),

@@ -19,6 +19,13 @@
                 <span class="ml-2 menu-title">V2Ray 订阅配置</span>
             </a>
         </li>
+
+        <li class="nav-item {{ Request::routeIs('admin.singbox.subscriptions') ? 'tactive' : '' }}">
+            <a class="nav-link" href="{{ route('admin.singbox.subscriptions') }}">
+                <i class="fa-solid fa-network-wired"></i>
+                <span class="ml-2 menu-title">Sing-box 订阅配置</span>
+            </a>
+        </li>
       
 
         <li class="nav-item {{ Request::routeIs('admin.activeConnections') ? 'tactive' : '' }}">

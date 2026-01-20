@@ -39,6 +39,23 @@ class _SignInScreenState extends State<SignInScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
+  Future<void> _submitLogin(AuthController authController) async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    final success = await authController.login(
+      email: email,
+      password: password,
+      deviceId: deviceId ?? 'unknown_device',
+    );
+    if (success && widget.onLoginSuccess != null) {
+      widget.onLoginSuccess!();
+    }
+  }
+
   String? deviceId;
 
   Future<String?> getDeviceId() async {
@@ -187,6 +204,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             },
                             controller: _passwordController,
                             obscureText: _obscurePassword,
+                            onFieldSubmitted: (_) => _submitLogin(authController),
                             decoration: InputDecoration(
                               hintText: '输入密码',
                               hintStyle: TextStyle(color: Colors.grey.shade600),
@@ -239,22 +257,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed: () async {
-                                if (_formKey.currentState?.validate() ?? false) {
-
-                                  final email = _emailController.text.trim();
-                                  final password = _passwordController.text.trim();
-
-                                  final success = await authController.login(
-                                    email: email,
-                                    password: password,
-                                    deviceId: deviceId ?? 'unknown_device',
-                                  );
-                                  if (success && widget.onLoginSuccess != null) {
-                                    widget.onLoginSuccess!();
-                                  }
-                                }
-                              },
+                              onPressed: () => _submitLogin(authController),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.appPrimaryColor,
                                 shape: RoundedRectangleBorder(

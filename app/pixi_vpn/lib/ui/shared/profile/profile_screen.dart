@@ -10,6 +10,9 @@ import 'package:pixi_vpn/ui/shared/home/v2_home_screen.dart';
 import 'package:pixi_vpn/utils/app_colors.dart';
 import 'package:pixi_vpn/controller/auth_controller.dart';
 import 'package:pixi_vpn/controller/profile_controller.dart';
+import 'package:pixi_vpn/controller/v2ray_vpn_controller.dart';
+import 'package:pixi_vpn/core/singbox/singbox_config_service.dart';
+import 'package:pixi_vpn/di_container.dart' as di;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -136,7 +139,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         isPremium,
                         remainingDays,
                       ),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 20),
+                      _buildRefreshSubscriptionButton(),
+                      const SizedBox(height: 20),
                       _buildLogoutButton(context),
                     ],
                   ),
@@ -262,6 +267,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                 : const Icon(Icons.chevron_right_rounded, color: Colors.black54),
         onTap: hasPendingRedeem ? null : _showRedeemDialog,
+      ),
+    );
+  }
+
+  Widget _buildRefreshSubscriptionButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          try {
+            await di.sl<SingboxConfigService>().fetchConfigs();
+          } catch (_) {
+            // ignore config fetch errors
+          }
+          try {
+            Get.find<V2rayVpnController>().getCountries();
+          } catch (_) {
+            // ignore country refresh errors
+          }
+          Fluttertoast.showToast(
+            msg: '订阅已更新',
+            backgroundColor: Colors.green,
+            textColor: Colors.white,
+          );
+        },
+        icon: const Icon(Icons.refresh),
+        label: Text(
+          '刷新订阅',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.appPrimaryColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
       ),
     );
   }
@@ -533,7 +576,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                '您确定要退出登录吗？',
+                '退出登录将断开当前连接，是否继续？',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
               ),

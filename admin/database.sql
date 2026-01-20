@@ -1033,3 +1033,19 @@ CREATE TABLE IF NOT EXISTS `v2ray_subscription_configs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_country` (`country_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Table structure for table `singbox_subscriptions`
+DROP TABLE IF EXISTS `singbox_subscriptions`;
+CREATE TABLE IF NOT EXISTS `singbox_subscriptions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(64) NOT NULL,
+  `platform` VARCHAR(16) NOT NULL DEFAULT 'windows',
+  `content_type` VARCHAR(24) NOT NULL COMMENT 'config_json or subscription_url',
+  `config_content` LONGTEXT NULL,
+  `subscription_url` TEXT NULL,
+  `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+  `priority` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

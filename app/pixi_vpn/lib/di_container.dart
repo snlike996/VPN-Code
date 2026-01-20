@@ -17,7 +17,9 @@ import 'package:pixi_vpn/data/repository/chat_repo.dart';
 import 'package:pixi_vpn/data/repository/contact_repo.dart';
 import 'package:pixi_vpn/data/repository/genral_setting_repo.dart';
 import 'package:pixi_vpn/data/repository/help_center_repo.dart';
+import 'package:pixi_vpn/data/repository/singbox_repo.dart';
 import 'package:pixi_vpn/data/repository/v2ray_repo.dart';
+import 'package:pixi_vpn/core/singbox/singbox_config_service.dart';
 import 'package:pixi_vpn/utils/app_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'controller/auth_controller.dart';
@@ -39,6 +41,7 @@ Future<void> init() async {
   sl.registerLazySingleton<FlutterSecureStorage>(() => FlutterSecureStorage());
   sl.registerLazySingleton(() => AuthRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => V2rayVpnRepo(dioClient: sl(), secureStorage: sl()));
+  sl.registerLazySingleton(() => SingboxRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => HelpCenterRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => ChatRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => ProfileRepo(dioClient: sl(), secureStorage: sl()));
@@ -48,6 +51,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ContactRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => GeneralSettingRepo(dioClient: sl(), secureStorage: sl()));
   sl.registerLazySingleton(() => ActiveServerRepo(dioClient: sl(), secureStorage: sl()));
+  sl.registerLazySingleton(() => SingboxConfigService(repo: sl()));
 
   /// Controller
   Get.lazyPut(() => AuthController(authRepo: sl(), dioClient: sl()), fenix: true);

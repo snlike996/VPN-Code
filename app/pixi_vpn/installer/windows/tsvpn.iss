@@ -13,6 +13,18 @@
   #define BuildDir "build\\windows\\x64\\runner\\Release"
 #endif
 
+#ifndef AppIconFile
+  #define AppIconFile "..\\windows\\runner\\resources\\app_icon.ico"
+#endif
+
+#ifndef WizardSmallImageFile
+  #define WizardSmallImageFile "wizard_small.bmp"
+#endif
+
+#ifndef WizardImageFile
+  #define WizardImageFile "wizard.bmp"
+#endif
+
 #ifndef VcRedistX64
   #define VcRedistX64 "redist\\vc_redist.x64.exe"
 #endif
@@ -31,6 +43,10 @@ DefaultDirName={pf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputDir=..\output
 OutputBaseFilename={#AppName}-Setup-{#AppVersion}-{#Platform}
+SetupIconFile={#AppIconFile}
+UninstallDisplayIcon={app}\app_icon.ico
+WizardSmallImageFile={#WizardSmallImageFile}
+WizardImageFile={#WizardImageFile}
 Compression=lzma2
 SolidCompression=yes
 DisableProgramGroupPage=yes
@@ -42,6 +58,7 @@ Name: "desktopicon"; Description: "Create a desktop icon"; Flags: unchecked
 
 [Files]
 Source: "{#BuildDir}\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#AppIconFile}"; DestDir: "{app}"; DestName: "app_icon.ico"; Flags: ignoreversion
 #if HaveVcRedistX64
 Source: "{#VcRedistX64}"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion
 #endif
@@ -50,8 +67,8 @@ Source: "{#VcRedistArm64}"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreve
 #endif
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon; IconFilename: "{app}\app_icon.ico"
 
 [Run]
 #if HaveVcRedistX64

@@ -34,6 +34,7 @@ class WindowsVpnManager {
 
   Process? _process;
   ProxyNode? _currentNode;
+  String? _currentConfigPath;
   bool _shouldRestart = false;
   int _restartAttempts = 0;
   bool _userInitiatedStop = false;
@@ -55,6 +56,7 @@ class WindowsVpnManager {
     _shouldRestart = autoRestart;
     _userInitiatedStop = false;
     _currentNode = node;
+    _currentConfigPath = null;
     state.value = WindowsVpnState.starting;
 
     try {
@@ -66,6 +68,59 @@ class WindowsVpnManager {
         localProxyPort: localProxyPort,
       );
       final configPath = await _writeConfig(config);
+
+      _process = await Process.start(
+        coreFile.path,
+        ['run', '-c', configPath],
+        workingDirectory: coreFile.parent.path,
+        runInShell: false,
+      );
+
+      _process?.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_logs.add);
+      _process?.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_logs.add);
+
+      _process?.exitCode.then(_handleExit);
+      state.value = WindowsVpnState.running;
+      if (dnsProtectionEnabled) {
+        try {
+          await _dnsProtect.enable();
+        } catch (e) {
+          _logs.add('DNS protection failed: $e');
+        }
+      }
+    } catch (e) {
+      state.value = WindowsVpnState.failed;
+      _logs.add('VPN start failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> connectWithConfig(String configPath, {ProxyNode? node}) async {
+    if (!WindowsPrivilege.isAdmin()) {
+      throw StateError('Administrator privileges required for VPN/TUN');
+    }
+
+    if (state.value == WindowsVpnState.starting ||
+        state.value == WindowsVpnState.running) {
+      return;
+    }
+
+    _shouldRestart = autoRestart;
+    _userInitiatedStop = false;
+    _currentNode = node;
+    _currentConfigPath = configPath;
+    state.value = WindowsVpnState.starting;
+
+    try {
+      await _tunAdapter.ensureReady();
+      await _firewall.applyRules();
+      final coreFile = await WindowsCoreBinary.ensureCoreBinary();
 
       _process = await Process.start(
         coreFile.path,
@@ -161,7 +216,11 @@ class WindowsVpnManager {
           return;
         }
         try {
-          await connect(_currentNode!);
+          if (_currentConfigPath != null) {
+            await connectWithConfig(_currentConfigPath!, node: _currentNode);
+          } else {
+            await connect(_currentNode!);
+          }
         } catch (_) {
           // connect handles state/logging
         }

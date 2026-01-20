@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\RedeemRequestController;
 use App\Http\Controllers\Admin\ServerController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
+use App\Http\Controllers\Admin\SingboxSubscriptionController;
 use App\Http\Controllers\Admin\V2raySubscriptionController;
 use App\Http\Controllers\EpayController;
 use Illuminate\Support\Facades\Route;
@@ -55,6 +56,11 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('v2ray/subscriptions', [V2raySubscriptionController::class, 'index'])->name('admin.v2ray.subscriptions');
     Route::post('v2ray/subscriptions', [V2raySubscriptionController::class, 'store'])->name('admin.v2ray.subscriptions.store');
     Route::post('v2ray/subscriptions/delete', [V2raySubscriptionController::class, 'delete'])->name('admin.v2ray.subscriptions.delete');
+
+    /* Sing-box Subscriptions */
+    Route::get('singbox/subscriptions', [SingboxSubscriptionController::class, 'index'])->name('admin.singbox.subscriptions');
+    Route::post('singbox/subscriptions', [SingboxSubscriptionController::class, 'store'])->name('admin.singbox.subscriptions.store');
+    Route::post('singbox/subscriptions/delete', [SingboxSubscriptionController::class, 'delete'])->name('admin.singbox.subscriptions.delete');
 
     /* OpenConnect */
     Route::post('openconnect/add', [OpenconnectController::class, 'store'])->name('admin.openconnect.add');

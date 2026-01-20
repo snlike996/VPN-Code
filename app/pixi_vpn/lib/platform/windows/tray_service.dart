@@ -36,11 +36,15 @@ class WindowsTrayService with TrayListener {
     required List<ProxyNode> nodes,
     required ProxyNode? current,
     required bool isConnected,
+    String? toolTip,
   }) async {
     _nodes = nodes;
     _current = current;
     _isConnected = isConnected;
     await _updateMenu();
+    if (toolTip != null) {
+      await trayManager.setToolTip(toolTip);
+    }
   }
 
   Future<void> dispose() async {
@@ -94,7 +98,7 @@ class WindowsTrayService with TrayListener {
     final items = <MenuItem>[
       MenuItem(
         key: 'toggle',
-        label: _isConnected ? 'Disconnect' : 'Connect',
+        label: _isConnected ? '断开' : '连接',
       ),
       MenuItem.separator(),
     ];
@@ -111,8 +115,8 @@ class WindowsTrayService with TrayListener {
     }
 
     items.addAll([
-      MenuItem(key: 'show', label: 'Show'),
-      MenuItem(key: 'exit', label: 'Exit'),
+      MenuItem(key: 'show', label: '打开主窗口'),
+      MenuItem(key: 'exit', label: '退出'),
     ]);
 
     await trayManager.setContextMenu(Menu(items: items));
@@ -120,7 +124,7 @@ class WindowsTrayService with TrayListener {
 
   Future<void> showMessage(String message) async {
     _messageTimer?.cancel();
-    await trayManager.setToolTip('TSVPN - $message');
+    await trayManager.setToolTip('TSVPN · $message');
     _messageTimer = Timer(const Duration(seconds: 5), () async {
       await trayManager.setToolTip('TSVPN');
     });

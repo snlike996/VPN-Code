@@ -12,6 +12,7 @@ use App\Http\Controllers\ServerController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V2raySubscriptionApiController;
+use App\Http\Controllers\Api\SingboxConfigApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -113,5 +114,6 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('v2ray/subscription/content', [V2raySubscriptionApiController::class, 'content']);
+        Route::get('singbox/configs', [SingboxConfigApiController::class, 'index']);
     });
 });
