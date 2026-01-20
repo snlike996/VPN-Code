@@ -10,9 +10,9 @@ import 'package:pixi_vpn/controller/v2ray_vpn_controller.dart';
 import 'package:pixi_vpn/model/country_item.dart';
 import 'package:pixi_vpn/ui/shared/auth/signin_screen.dart';
 import 'package:pixi_vpn/utils/app_colors.dart';
-import '../../ads/ads_service.dart';
-import '../../controller/auth_controller.dart';
-import '../../controller/app_setting_controller.dart';
+import 'package:pixi_vpn/ads/ads_service.dart';
+import 'package:pixi_vpn/controller/app_setting_controller.dart';
+import 'package:pixi_vpn/controller/auth_controller.dart';
 import 'v2_nodes_screen.dart';
 
 class V2LocationScreen extends StatefulWidget {

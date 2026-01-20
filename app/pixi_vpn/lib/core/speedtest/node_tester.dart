@@ -415,8 +415,7 @@ class NodeTester {
         socket,
         host: sni ?? host,
         onBadCertificate: (_) => true,
-        timeout: timeout,
-      );
+      ).timeout(timeout);
       secureSocket.destroy();
       return _ProbeResult(success: true, statusCode: 200);
     } catch (_) {

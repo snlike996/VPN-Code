@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../controller/profile_controller.dart';
+import 'package:pixi_vpn/controller/profile_controller.dart';
 
 class InAppPurchaseScreen extends StatefulWidget {
   const InAppPurchaseScreen({super.key});

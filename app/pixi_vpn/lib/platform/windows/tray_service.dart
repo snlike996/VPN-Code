@@ -96,7 +96,7 @@ class WindowsTrayService with TrayListener {
         key: 'toggle',
         label: _isConnected ? 'Disconnect' : 'Connect',
       ),
-      const MenuItem.separator(),
+      MenuItem.separator(),
     ];
 
     final nodeItems = _nodes.take(5).map((node) {
@@ -107,7 +107,7 @@ class WindowsTrayService with TrayListener {
 
     if (nodeItems.isNotEmpty) {
       items.addAll(nodeItems);
-      items.add(const MenuItem.separator());
+      items.add(MenuItem.separator());
     }
 
     items.addAll([

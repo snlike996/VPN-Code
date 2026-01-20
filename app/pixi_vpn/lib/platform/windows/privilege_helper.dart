@@ -1,7 +1,18 @@
-import 'package:win32/win32.dart' as win32;
+import 'dart:ffi';
+import 'dart:io';
 
 class WindowsPrivilege {
   static bool isAdmin() {
-    return win32.IsUserAnAdmin() != 0;
+    if (!Platform.isWindows) {
+      return false;
+    }
+    try {
+      final shell32 = DynamicLibrary.open('shell32.dll');
+      final isUserAnAdmin =
+          shell32.lookupFunction<Int32 Function(), int Function()>('IsUserAnAdmin');
+      return isUserAnAdmin() != 0;
+    } catch (_) {
+      return false;
+    }
   }
 }

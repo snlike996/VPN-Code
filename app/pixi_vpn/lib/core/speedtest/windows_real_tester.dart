@@ -187,10 +187,9 @@ class WindowsRealTester {
       secureSocket = await SecureSocket.secure(
         socket,
         supportedProtocols: const ['http/1.1'],
-        timeout: timeout,
         onBadCertificate: (_) => true,
         host: sni,
-      );
+      ).timeout(timeout);
       stopwatch.stop();
       return stopwatch.elapsedMilliseconds;
     } catch (_) {

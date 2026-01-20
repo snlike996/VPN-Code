@@ -8,8 +8,8 @@ import 'package:pixi_vpn/ui/shared/auth/signin_screen.dart';
 import 'package:pixi_vpn/ui/shared/auth/sign_up_screen.dart';
 import 'package:pixi_vpn/ui/shared/home/v2_home_screen.dart';
 import 'package:pixi_vpn/utils/app_colors.dart';
-import '../../controller/auth_controller.dart';
-import '../../controller/profile_controller.dart';
+import 'package:pixi_vpn/controller/auth_controller.dart';
+import 'package:pixi_vpn/controller/profile_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
