@@ -259,7 +259,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       }
       final sorted = await WindowsRealTester.testAndSort(
         _controller.vpnServers,
-        timeout: const Duration(milliseconds: 1200),
+        timeout: const Duration(seconds: 5),
       );
       _controller.setVpnServers(sorted);
       _selectedNode ??= NodeSelector.pickBest(sorted);
@@ -587,17 +587,22 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                   final available = node.available && _isLoggedIn;
                   final titleStyle =
                       available ? null : const TextStyle(color: Colors.grey);
+                  final errorLabel = _describeTestError(node.testError);
                   final subtitle = available
                       ? Text(node.type.toUpperCase())
-                      : Tooltip(
-                          message: _isLoggedIn
-                              ? '该节点当前无法连接，请稍后重试'
-                              : '请先登录',
-                          child: const Text(
-                            '不可用',
-                            style: TextStyle(color: Colors.redAccent),
-                          ),
-                        );
+                      : (node.testedAt == null && _isTesting)
+                          ? const Text('测速中…', style: TextStyle(color: Colors.grey))
+                          : Tooltip(
+                              message: _isLoggedIn
+                                  ? (node.testError == null
+                                      ? '该节点当前无法连接，请稍后重试'
+                                      : '测速失败：$errorLabel')
+                                  : '请先登录',
+                              child: const Text(
+                                '不可用',
+                                style: TextStyle(color: Colors.redAccent),
+                              ),
+                            );
                   return ListTile(
                     selected: selected,
                     title: Text(node.displayName, style: titleStyle),
@@ -607,7 +612,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                         ? () => _selectNode(node)
                         : () {
                             final msg = _isLoggedIn
-                                ? '该节点当前不可用，请稍后重试。'
+                                ? (node.testError == null
+                                    ? '该节点当前不可用，请稍后重试。'
+                                    : '该节点当前不可用：$errorLabel')
                                 : '请先登录';
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(msg)),
@@ -1044,13 +1051,34 @@ class _LatencyBadge extends StatelessWidget {
 
   const _LatencyBadge({required this.node, required this.isBest});
 
+  String _labelForError(String? error) {
+    switch (error) {
+      case 'timeout':
+        return '超时';
+      case 'handshake_failed':
+        return '握手失败';
+      case 'config_error':
+        return '配置错误';
+      case 'latency_missing':
+        return '无延迟';
+      case 'unavailable':
+        return '不可用';
+      default:
+        return '不可用';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!node.available || node.latencyMs == null) {
-      return const Text(
-        '不可用',
-        style: TextStyle(color: Colors.redAccent),
-      );
+      if (node.testedAt == null) {
+        return const Text(
+          '测速中…',
+          style: TextStyle(color: Colors.grey),
+        );
+      }
+      final label = _labelForError(node.testError);
+      return Text(label, style: const TextStyle(color: Colors.redAccent));
     }
 
     final displayMs = node.tlsMs ?? node.tcpMs ?? node.latencyMs!;
@@ -1069,5 +1097,22 @@ class _LatencyBadge extends StatelessWidget {
     final valueLabel = displayMs < 10 ? '≤10ms' : '$latency ms';
     final label = isBest ? '$labelPrefix $valueLabel (Best)' : '$labelPrefix $valueLabel';
     return Text(label, style: TextStyle(color: color));
+  }
+}
+
+String _describeTestError(String? error) {
+  switch (error) {
+    case 'timeout':
+      return '超时';
+    case 'handshake_failed':
+      return '握手失败';
+    case 'config_error':
+      return '配置错误';
+    case 'latency_missing':
+      return '无延迟';
+    case 'unavailable':
+      return '不可用';
+    default:
+      return '不可用';
   }
 }

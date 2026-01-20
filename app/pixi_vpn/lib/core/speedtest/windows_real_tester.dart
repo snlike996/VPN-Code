@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/proxy_node.dart';
+import '../../platform/windows/core_binary.dart';
+import '../../platform/windows/vpn_config_builder.dart';
 
 class SpeedTestResult {
   final bool available;
@@ -14,6 +18,8 @@ class SpeedTestResult {
   final int scoreMs;
   final int? jitterMs;
   final DateTime testedAt;
+  final String? error;
+  final int? exitCode;
 
   SpeedTestResult({
     required this.available,
@@ -22,11 +28,13 @@ class SpeedTestResult {
     required this.scoreMs,
     required this.jitterMs,
     required this.testedAt,
+    required this.error,
+    required this.exitCode,
   });
 }
 
 class WindowsRealTester {
-  static const Duration _timeout = Duration(milliseconds: 1200);
+  static const Duration _timeout = Duration(seconds: 5);
   static const Duration _cacheTtl = Duration(minutes: 5);
   static const int _maxConcurrency = 5;
 
@@ -79,6 +87,7 @@ class WindowsRealTester {
     Duration timeout = _timeout,
   }) async {
     final now = DateTime.now();
+    final protocol = _detectProtocol(node.raw);
     final hostPort = _extractHostPort(node.raw);
     if (hostPort == null) {
       return SpeedTestResult(
@@ -88,7 +97,28 @@ class WindowsRealTester {
         scoreMs: 999999,
         jitterMs: null,
         testedAt: now,
+        error: 'config_error',
+        exitCode: null,
       );
+    }
+
+    final singboxResult = await _testWithSingbox(
+      node: node,
+      timeout: timeout,
+      host: hostPort.host,
+      port: hostPort.port,
+      protocol: protocol,
+    );
+    if (singboxResult != null) {
+      await _appendLog(
+        node: node,
+        host: hostPort.host,
+        port: hostPort.port,
+        protocol: protocol,
+        result: singboxResult,
+        exitCode: singboxResult.exitCode,
+      );
+      return singboxResult;
     }
 
     final isTls = _isTlsNode(node.raw, hostPort.port);
@@ -109,15 +139,27 @@ class WindowsRealTester {
     final available = isTls ? tlsMs != null : tcpMs != null;
     final scoreMs = tlsMs ?? tcpMs ?? 999999;
     final jitterMs = _jitter([...tcpSamples, ...tlsSamples]);
+    final error = available ? null : _inferSocketError(isTls, tcpMs, tlsMs);
 
-    return SpeedTestResult(
+    final result = SpeedTestResult(
       available: available,
       tcpMs: tcpMs,
       tlsMs: tlsMs,
       scoreMs: scoreMs,
       jitterMs: jitterMs,
       testedAt: now,
+      error: error,
+      exitCode: null,
     );
+    await _appendLog(
+      node: node,
+      host: hostPort.host,
+      port: hostPort.port,
+      protocol: protocol,
+      result: result,
+      exitCode: null,
+    );
+    return result;
   }
 
   static Future<List<int>> _runSamples(Future<int?> Function() runner) async {
@@ -198,6 +240,213 @@ class WindowsRealTester {
       secureSocket?.destroy();
       socket?.destroy();
     }
+  }
+
+  static Future<SpeedTestResult?> _testWithSingbox({
+    required ProxyNode node,
+    required Duration timeout,
+    required String host,
+    required int port,
+    required String protocol,
+  }) async {
+    if (!Platform.isWindows) {
+      return null;
+    }
+    final now = DateTime.now();
+    File? binary;
+    try {
+      binary = await WindowsCoreBinary.ensureCoreBinary();
+    } catch (_) {
+      return null;
+    }
+
+    final configDir = await _ensureTestConfigDir();
+    final configPath = File(
+      '${configDir.path}\\node_${_fnv1a(node.raw)}.json',
+    );
+    try {
+      final content = WindowsVpnConfigBuilder.buildTestConfig(node);
+      await configPath.writeAsString(content, flush: true);
+    } catch (_) {
+      return SpeedTestResult(
+        available: false,
+        tcpMs: null,
+        tlsMs: null,
+        scoreMs: 999999,
+        jitterMs: null,
+        testedAt: now,
+        error: 'config_error',
+        exitCode: null,
+      );
+    }
+
+    final stopwatch = Stopwatch()..start();
+    final result = await Isolate.run(
+      () async => _runSingboxTest(
+        binary!.path,
+        configPath.path,
+        timeout,
+      ),
+    );
+    stopwatch.stop();
+
+    final latencyMs = result.latencyMs;
+    final available = result.success && latencyMs != null;
+    final error = available ? null : result.error;
+
+    return SpeedTestResult(
+      available: available,
+      tcpMs: null,
+      tlsMs: latencyMs,
+      scoreMs: latencyMs ?? 999999,
+      jitterMs: null,
+      testedAt: now,
+      error: error,
+      exitCode: result.exitCode,
+    );
+  }
+
+  static Future<_SingboxResult> _runSingboxTest(
+    String exePath,
+    String configPath,
+    Duration timeout,
+  ) async {
+    final args = [
+      'test',
+      '-c',
+      configPath,
+      '--timeout',
+      '${timeout.inSeconds}s',
+    ];
+    final stdoutBuffer = StringBuffer();
+    final stderrBuffer = StringBuffer();
+    int? exitCode;
+    try {
+      final proc = await Process.start(exePath, args);
+      proc.stdout.transform(utf8.decoder).listen(stdoutBuffer.write);
+      proc.stderr.transform(utf8.decoder).listen(stderrBuffer.write);
+      exitCode = await proc.exitCode.timeout(
+        timeout,
+        onTimeout: () {
+          proc.kill();
+          return -1;
+        },
+      );
+    } catch (e) {
+      return _SingboxResult(
+        success: false,
+        latencyMs: null,
+        error: 'process_error: $e',
+        exitCode: exitCode,
+      );
+    }
+
+    final output = '${stdoutBuffer.toString()}\n${stderrBuffer.toString()}';
+    final latency = _parseLatency(output);
+    final success = exitCode == 0;
+    String? error;
+    if (success) {
+      error = latency == null ? 'latency_missing' : null;
+    } else if (exitCode == -1) {
+      error = 'timeout';
+    } else {
+      error = _inferSingboxError(output);
+    }
+
+    return _SingboxResult(
+      success: success,
+      latencyMs: latency,
+      error: error,
+      exitCode: exitCode,
+      output: output,
+    );
+  }
+
+  static int? _parseLatency(String output) {
+    final match = RegExp(r'latency\\s*[:=]\\s*(\\d+)\\s*ms', caseSensitive: false)
+        .firstMatch(output);
+    if (match != null) {
+      return int.tryParse(match.group(1) ?? '');
+    }
+    final fallback = RegExp(r'(\\d+)\\s*ms', caseSensitive: false).firstMatch(output);
+    if (fallback != null) {
+      return int.tryParse(fallback.group(1) ?? '');
+    }
+    return null;
+  }
+
+  static String _inferSingboxError(String output) {
+    final lower = output.toLowerCase();
+    if (lower.contains('timeout')) {
+      return 'timeout';
+    }
+    if (lower.contains('handshake') || lower.contains('tls')) {
+      return 'handshake_failed';
+    }
+    if (lower.contains('config') || lower.contains('parse')) {
+      return 'config_error';
+    }
+    return 'unavailable';
+  }
+
+  static String? _inferSocketError(bool isTls, int? tcpMs, int? tlsMs) {
+    if (isTls && tlsMs == null) {
+      return tcpMs == null ? 'timeout' : 'handshake_failed';
+    }
+    if (!isTls && tcpMs == null) {
+      return 'timeout';
+    }
+    return null;
+  }
+
+  static Future<Directory> _ensureTestConfigDir() async {
+    final supportDir = await getApplicationSupportDirectory();
+    final dir = Directory('${supportDir.path}\\speedtest');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  static Future<void> _appendLog({
+    required ProxyNode node,
+    required String host,
+    required int port,
+    required String protocol,
+    required SpeedTestResult result,
+    required int? exitCode,
+  }) async {
+    final supportDir = await getApplicationSupportDirectory();
+    final logDir = Directory('${supportDir.path}\\logs');
+    if (!await logDir.exists()) {
+      await logDir.create(recursive: true);
+    }
+    final logFile = File('${logDir.path}\\speedtest.log');
+    final rtt = result.tlsMs ?? result.tcpMs ?? result.scoreMs;
+    final line = [
+      DateTime.now().toIso8601String(),
+      node.displayName.replaceAll('\n', ' '),
+      '$protocol $host:$port',
+      result.available ? 'ok' : 'fail',
+      'rtt=${rtt}ms',
+      'err=${result.error ?? '-'}',
+      'exit=${exitCode ?? '-'}',
+    ].join(' | ');
+    await logFile.writeAsString('$line\n', mode: FileMode.append, flush: true);
+  }
+
+  static String _detectProtocol(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.startsWith('vless://')) {
+      return 'vless';
+    }
+    if (lower.startsWith('trojan://')) {
+      return 'trojan';
+    }
+    if (lower.startsWith('vmess://')) {
+      return 'vmess';
+    }
+    return 'unknown';
   }
 
   static _HostPort? _extractHostPort(String raw) {
@@ -431,6 +680,8 @@ class WindowsRealTester {
         tlsMs: json['tlsMs'] as int?,
         available: (json['available'] as bool?) ?? false,
         testedAt: testedAt,
+        error: json['error'] as String?,
+        exitCode: null,
       );
     } catch (_) {
       prefs.remove(key);
@@ -449,6 +700,7 @@ class WindowsRealTester {
       'tlsMs': result.tlsMs,
       'available': result.available,
       'testedAt': result.testedAt.millisecondsSinceEpoch,
+      'error': result.error,
     });
     await prefs.setString(key, payload);
   }
@@ -459,6 +711,7 @@ class WindowsRealTester {
     node.available = result.available;
     node.latencyMs = result.scoreMs;
     node.testedAt = result.testedAt;
+    node.testError = result.error;
   }
 
   static int _compareNodes(ProxyNode a, ProxyNode b) {
@@ -492,6 +745,8 @@ class _CacheEntry extends SpeedTestResult {
     required super.tlsMs,
     required super.available,
     required super.testedAt,
+    required super.error,
+    required super.exitCode,
   }) : super(
           scoreMs: (tlsMs ?? tcpMs ?? 999999),
           jitterMs: null,
@@ -503,6 +758,22 @@ class _HostPort {
   final int port;
 
   _HostPort({required this.host, required this.port});
+}
+
+class _SingboxResult {
+  final bool success;
+  final int? latencyMs;
+  final String? error;
+  final int? exitCode;
+  final String? output;
+
+  _SingboxResult({
+    required this.success,
+    required this.latencyMs,
+    required this.error,
+    required this.exitCode,
+    this.output,
+  });
 }
 
 Future<void> _runWithConcurrency(

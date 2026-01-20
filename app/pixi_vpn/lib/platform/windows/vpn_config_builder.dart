@@ -9,41 +9,7 @@ class WindowsVpnConfigBuilder {
       throw StateError('Unsupported node format: ${node.raw}');
     }
 
-    final outbound = <String, dynamic>{
-      'type': parsed.protocol,
-      'tag': 'proxy',
-      'server': parsed.host,
-      'server_port': parsed.port,
-    };
-
-    if (parsed.protocol == 'vless') {
-      outbound['uuid'] = parsed.uuid;
-    } else if (parsed.protocol == 'trojan') {
-      outbound['password'] = parsed.password;
-    } else if (parsed.protocol == 'vmess') {
-      outbound['uuid'] = parsed.uuid;
-      if (parsed.alterId != null) {
-        outbound['alter_id'] = parsed.alterId;
-      }
-    }
-
-    if (parsed.transport == 'ws') {
-      outbound['transport'] = {
-        'type': 'ws',
-        'path': parsed.wsPath ?? '/',
-        'headers': {
-          'Host': parsed.wsHost ?? parsed.sni ?? parsed.host,
-        },
-      };
-    }
-
-    if (parsed.tlsEnabled) {
-      outbound['tls'] = {
-        'enabled': true,
-        'server_name': parsed.sni ?? parsed.host,
-        'insecure': true,
-      };
-    }
+    final outbound = _buildOutbound(parsed);
 
     final inbounds = [
       {
@@ -94,6 +60,76 @@ class WindowsVpnConfigBuilder {
     };
 
     return const JsonEncoder.withIndent('  ').convert(config);
+  }
+
+  static String buildTestConfig(ProxyNode node) {
+    final parsed = _parse(node.raw);
+    if (parsed == null) {
+      throw StateError('Unsupported node format: ${node.raw}');
+    }
+
+    final outbound = _buildOutbound(parsed);
+    final config = <String, dynamic>{
+      'log': {
+        'level': 'warn',
+      },
+      'outbounds': [
+        outbound,
+        {
+          'type': 'direct',
+          'tag': 'direct',
+        },
+        {
+          'type': 'block',
+          'tag': 'block',
+        },
+      ],
+      'route': {
+        'final': 'proxy',
+      },
+    };
+
+    return const JsonEncoder.withIndent('  ').convert(config);
+  }
+
+  static Map<String, dynamic> _buildOutbound(_ParsedNode parsed) {
+    final outbound = <String, dynamic>{
+      'type': parsed.protocol,
+      'tag': 'proxy',
+      'server': parsed.host,
+      'server_port': parsed.port,
+    };
+
+    if (parsed.protocol == 'vless') {
+      outbound['uuid'] = parsed.uuid;
+    } else if (parsed.protocol == 'trojan') {
+      outbound['password'] = parsed.password;
+    } else if (parsed.protocol == 'vmess') {
+      outbound['uuid'] = parsed.uuid;
+      if (parsed.alterId != null) {
+        outbound['alter_id'] = parsed.alterId;
+      }
+    }
+
+    if (parsed.transport == 'ws') {
+      outbound['transport'] = {
+        'type': 'ws',
+        'path': parsed.wsPath ?? '/',
+        'headers': {
+          'Host': parsed.wsHost ?? parsed.sni ?? parsed.host,
+        },
+      };
+    }
+
+    if (parsed.tlsEnabled) {
+      outbound['tls'] = {
+        'enabled': true,
+        'server_name': parsed.sni ?? parsed.host,
+        'insecure': true,
+      };
+    }
+
+    return outbound;
   }
 
   static _ParsedNode? _parse(String raw) {

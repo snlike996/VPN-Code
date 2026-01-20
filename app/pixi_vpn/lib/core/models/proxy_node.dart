@@ -9,6 +9,7 @@ class ProxyNode {
   int? tcpMs;
   int? tlsMs;
   bool available;
+  String? testError;
   DateTime? testedAt;
 
   ProxyNode({
@@ -22,6 +23,7 @@ class ProxyNode {
     this.tcpMs,
     this.tlsMs,
     this.available = false,
+    this.testError,
     this.testedAt,
   });
 
