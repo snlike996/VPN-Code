@@ -26,23 +26,33 @@ class ApiErrorHandler {
               "Receive timeout in connection with server";
               break;
             case DioExceptionType.badResponse:
-              switch (error.response!.statusCode) {
+              final response = error.response;
+              if (response == null) {
+                errorDescription = "Bad response from server";
+                break;
+              }
+              switch (response.statusCode) {
                 case 404:
                 case 500:
                 case 503:
-                  errorDescription = error.response!.statusMessage;
+                  errorDescription = response.statusMessage;
                   break;
                 case 429:
-                  errorDescription = "Too many request";
+                  errorDescription = "Too many requests";
                   break;
                 default:
-                  ErrorResponse errorResponse =
-                  ErrorResponse.fromJson(error.response!.data);
+                  final data = response.data;
+                  if (data is Map<String, dynamic>) {
+                    ErrorResponse errorResponse =
+                    ErrorResponse.fromJson(data);
 
-                  if (errorResponse.error != null) {
-                    errorDescription = errorResponse;
+                    if (errorResponse.error != null) {
+                      errorDescription = errorResponse;
+                    } else {
+                      errorDescription = "Failed to load data - status code: ${response.statusCode}";
+                    }
                   } else {
-                    errorDescription = "Failed to load data - status code: ${error.response!.statusCode}";
+                    errorDescription = "Failed to load data - status code: ${response.statusCode}";
                   }
               }
               break;
