@@ -17,7 +17,12 @@
   #define VcRedistX64 "redist\\vc_redist.x64.exe"
 #endif
 
+#ifndef VcRedistArm64
+  #define VcRedistArm64 "redist\\vc_redist.arm64.exe"
+#endif
+
 #define HaveVcRedistX64 FileExists(SourcePath + VcRedistX64)
+#define HaveVcRedistArm64 FileExists(SourcePath + VcRedistArm64)
 
 [Setup]
 AppName={#AppName}
@@ -40,6 +45,9 @@ Source: "{#BuildDir}\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdi
 #if HaveVcRedistX64
 Source: "{#VcRedistX64}"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion
 #endif
+#if HaveVcRedistArm64
+Source: "{#VcRedistArm64}"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion
+#endif
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -47,12 +55,25 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 
 [Run]
 #if HaveVcRedistX64
-Filename: "{tmp}\\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Flags: waituntilterminated runhidden; Check: ShouldInstallVCRedist
+Filename: "{tmp}\\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime (x64)..."; Flags: waituntilterminated runhidden; Check: ShouldInstallVCRedistX64
+#endif
+#if HaveVcRedistArm64
+Filename: "{tmp}\\vc_redist.arm64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime (ARM64)..."; Flags: waituntilterminated runhidden; Check: ShouldInstallVCRedistArm64
 #endif
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function IsVCRedistInstalled: Boolean;
+function IsArm64: Boolean;
+var
+  Arch: String;
+begin
+  Arch := Uppercase(GetEnv('PROCESSOR_ARCHITEW6432'));
+  if Arch = '' then
+    Arch := Uppercase(GetEnv('PROCESSOR_ARCHITECTURE'));
+  Result := Arch = 'ARM64';
+end;
+
+function IsVCRedistInstalledX64: Boolean;
 var
   Installed: Cardinal;
 begin
@@ -61,7 +82,21 @@ begin
     'Installed', Installed) and (Installed = 1);
 end;
 
-function ShouldInstallVCRedist: Boolean;
+function IsVCRedistInstalledArm64: Boolean;
+var
+  Installed: Cardinal;
 begin
-  Result := not IsVCRedistInstalled;
+  Result := RegQueryDWordValue(HKLM64,
+    'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\ARM64',
+    'Installed', Installed) and (Installed = 1);
+end;
+
+function ShouldInstallVCRedistX64: Boolean;
+begin
+  Result := (not IsArm64) and (not IsVCRedistInstalledX64);
+end;
+
+function ShouldInstallVCRedistArm64: Boolean;
+begin
+  Result := IsArm64 and (not IsVCRedistInstalledArm64);
 end;
