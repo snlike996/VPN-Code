@@ -48,23 +48,18 @@ jobs:
       - name: Build APKs (release, split per ABI)
         run: flutter build apk --release --split-per-abi --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
 
-      - name: Build AAB
-        run: flutter build appbundle --release --build-name "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER" --verbose
-
       - name: Rename Android artifacts
         run: |
           cd build/app/outputs/flutter-apk
           mv app-arm64-v8a-release.apk TSVPN-arm64-v8a-release.apk || true
           mv app-armeabi-v7a-release.apk TSVPN-armeabi-v7a-release.apk || true
           mv app-x86_64-release.apk TSVPN-x86_64-release.apk || true
-          cd ../bundle/release
-          mv app-release.aab TSVPN-release.aab || true
+          
 
       - name: Stage Android artifacts
         run: |
           mkdir -p build/ci/android
           cp -f build/app/outputs/flutter-apk/TSVPN-*-release.apk build/ci/android/ || true
-          cp -f build/app/outputs/bundle/release/TSVPN-release.aab build/ci/android/ || true
           ls -la build/ci/android
 
       - name: Upload Android artifacts
@@ -196,7 +191,6 @@ jobs:
           * TSVPN-arm64-v8a-release.apk（推荐，大多数手机）
           * TSVPN-armeabi-v7a-release.apk
           * TSVPN-x86_64-release.apk（模拟器）
-          * TSVPN-release.aab（Google Play）
 
           🖥 Windows
 
@@ -212,6 +206,5 @@ jobs:
           body_path: release_notes.md
           files: |
             dist/android-release/TSVPN-*-release.apk
-            dist/android-release/TSVPN-release.aab
             dist/windows-release/TSVPN-Setup-x64.exe
             dist/windows-release/TSVPN.exe

@@ -56,6 +56,9 @@ class WindowsRealTester {
       if (cached != null) {
         _applyResult(node, cached);
       } else {
+        node.health = NodeHealth.testing;
+        node.lastError = null;
+        node.lastTestAt = now;
         toTest.add(node);
       }
     }
@@ -712,14 +715,23 @@ class WindowsRealTester {
     node.latencyMs = result.scoreMs;
     node.testedAt = result.testedAt;
     node.testError = result.error;
+    node.lastError = result.error;
+    node.lastTestAt = result.testedAt;
+    node.health = _classifyHealth(result);
   }
 
   static int _compareNodes(ProxyNode a, ProxyNode b) {
-    if (a.available != b.available) {
-      return a.available ? -1 : 1;
+    final aScore = a.latencyMs;
+    final bScore = b.latencyMs;
+    if (aScore == null && bScore == null) {
+      return 0;
     }
-    final aScore = a.latencyMs ?? 999999;
-    final bScore = b.latencyMs ?? 999999;
+    if (aScore == null) {
+      return 1;
+    }
+    if (bScore == null) {
+      return -1;
+    }
     return aScore.compareTo(bScore);
   }
 
@@ -751,6 +763,26 @@ class _CacheEntry extends SpeedTestResult {
           scoreMs: (tlsMs ?? tcpMs ?? 999999),
           jitterMs: null,
         );
+}
+
+NodeHealth _classifyHealth(SpeedTestResult result) {
+  if (!result.available || result.error != null) {
+    return NodeHealth.unavailable;
+  }
+  final latency = result.scoreMs;
+  if (latency <= 200) {
+    return NodeHealth.excellent;
+  }
+  if (latency <= 500) {
+    return NodeHealth.good;
+  }
+  if (latency <= 800) {
+    return NodeHealth.fair;
+  }
+  if (latency <= 1500) {
+    return NodeHealth.poor;
+  }
+  return NodeHealth.unavailable;
 }
 
 class _HostPort {

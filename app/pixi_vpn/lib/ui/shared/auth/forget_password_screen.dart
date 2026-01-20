@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pixi_vpn/controller/auth_controller.dart';
 import 'package:pixi_vpn/utils/app_colors.dart';
+import 'auth_scaffold.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -20,72 +21,63 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return GetBuilder<AuthController>(
       builder: (authController) {
-        return Scaffold(
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 1,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 20),
-                    Center(
-                      child: Text(
-                        '忘记密码',
-                        style: GoogleFonts.poppins(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.appPrimaryColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          '请输入您的邮箱，我们将发送验证码以恢复您的密码',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            color: Colors.black87,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    Text(
-                      '邮箱',
+        return AuthScaffold(
+          builder: (context, layout) {
+            final paddingY = (layout.fieldHeight - 20) / 2;
+            return Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Text(
+                      '忘记密码',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.appPrimaryColor,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextFormField(
+                  ),
+                  SizedBox(height: layout.spacing),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        '请输入您的邮箱，我们将发送验证码以恢复您的密码',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: layout.spacing * 1.5),
+                  Text(
+                    '邮箱',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: layout.spacing / 2),
+                  SizedBox(
+                    height: layout.fieldHeight,
+                    child: TextFormField(
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return "请输入邮箱";
+                          return '请输入邮箱';
                         }
-                        // Email regex check
-                        bool emailValid = RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value);
+                        final emailValid = RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value);
                         if (!emailValid) {
-                          return "请输入有效的邮箱";
+                          return '请输入有效的邮箱';
                         }
                         return null;
                       },
@@ -99,93 +91,90 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 16,
+                          vertical: paddingY,
                         ),
                       ),
                     ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState?.validate() ?? false) {
-
-                            final email = _emailController.text.trim();
-
-                            authController.forgetPassword(email: email);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.appPrimaryColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 0,
+                  ),
+                  SizedBox(height: layout.spacing * 1.5),
+                  SizedBox(
+                    width: double.infinity,
+                    height: layout.buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (_formKey.currentState?.validate() ?? false) {
+                          final email = _emailController.text.trim();
+                          authController.forgetPassword(email: email);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.appPrimaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        child:
-                        authController.isLoadingForget==false?
-                        Text(
-                          '提交',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ):
-                        SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white)
+                        elevation: 0,
+                      ),
+                      child: authController.isLoadingForget == false
+                          ? Text(
+                              '提交',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
                             )
-                        )
-                      ),
+                          : const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
                     ),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '返回 ',
+                  ),
+                  SizedBox(height: layout.spacing),
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '返回 ',
+                          style: GoogleFonts.poppins(
+                            color: Colors.black87,
+                            fontSize: 16,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            '登录',
                             style: GoogleFonts.poppins(
-                              color: Colors.black87,
+                              color: AppColors.appPrimaryColor,
+                              fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child:  Text(
-                              '登录',
-                              style: GoogleFonts.poppins(
-                                color: AppColors.appPrimaryColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ),
+            );
+          },
         );
-      }
+      },
     );
   }
 }

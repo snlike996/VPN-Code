@@ -1,3 +1,13 @@
+enum NodeHealth {
+  unknown,
+  testing,
+  excellent,
+  good,
+  fair,
+  poor,
+  unavailable,
+}
+
 class ProxyNode {
   final String id;
   final String type;
@@ -11,6 +21,9 @@ class ProxyNode {
   bool available;
   String? testError;
   DateTime? testedAt;
+  NodeHealth health;
+  String? lastError;
+  DateTime? lastTestAt;
 
   ProxyNode({
     required this.id,
@@ -25,6 +38,9 @@ class ProxyNode {
     this.available = false,
     this.testError,
     this.testedAt,
+    this.health = NodeHealth.unknown,
+    this.lastError,
+    this.lastTestAt,
   });
 
   String get displayName {

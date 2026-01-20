@@ -14,6 +14,7 @@ import '../../core/connection/connection_controller.dart';
 import '../../core/models/proxy_node.dart';
 import '../../core/selector/node_selector.dart';
 import '../../core/speedtest/windows_real_tester.dart';
+import '../../utils/app_colors.dart';
 import '../../platform/windows/admin_check.dart';
 import '../../platform/windows/autostart.dart';
 import '../../platform/windows/connection_adapter.dart';
@@ -65,6 +66,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   int _reconnectFailureCount = 0;
   bool _isLoggedIn = false;
   String _userLabel = '登录';
+  Timer? _testDebounce;
 
   @override
   void initState() {
@@ -103,6 +105,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
 
   @override
   void dispose() {
+    _testDebounce?.cancel();
     _autoConnectTimer?.cancel();
     _notificationSubscription?.cancel();
     _configNoticeSubscription?.cancel();
@@ -175,10 +178,25 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       }
       return;
     }
-    if (!node.available) {
+    if (node.health == NodeHealth.testing ||
+        node.health == NodeHealth.unknown) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('该节点当前不可用，请稍后重试。')),
+          const SnackBar(content: Text('节点测速中，请稍后再试。')),
+        );
+      }
+      return;
+    }
+    if (node.health == NodeHealth.unavailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              node.lastError == null
+                  ? '该节点当前不可用，请稍后重试。'
+                  : '该节点当前不可用：${_describeTestError(node.lastError)}',
+            ),
+          ),
         );
       }
       return;
@@ -195,6 +213,11 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     }
     try {
       _lastConnectFailed = false;
+      if (mounted) {
+        debugPrint(
+          'Connect node id=${node.id} name=${node.displayName} type=${node.type} host=${node.host ?? ''} port=${node.port ?? ''}',
+        );
+      }
       await widget.controller.connect(node, silent: _silentLaunch);
     } catch (e) {
       _lastConnectFailed = true;
@@ -244,6 +267,59 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       await widget.controller.disconnect(userInitiated: false);
       await _connectSelected();
     }
+  }
+
+  void _handleNodeTap(ProxyNode node) {
+    setState(() {
+      _selectedNode = node;
+    });
+    if (node.health == NodeHealth.unknown && !_isTesting) {
+      _testDebounce?.cancel();
+      _testDebounce = Timer(const Duration(milliseconds: 300), () {
+        _retestNode(node);
+      });
+    }
+  }
+
+  Future<void> _retestNode(ProxyNode node) async {
+    if (_isTesting) {
+      return;
+    }
+    await WindowsRealTester.clearCacheFor([node]);
+    await _runSpeedTest();
+  }
+
+  Future<void> _copyNodeName(ProxyNode node) async {
+    await Clipboard.setData(ClipboardData(text: node.displayName));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已复制节点名')),
+    );
+  }
+
+  void _showNodeError(ProxyNode node) {
+    final message = node.lastError;
+    if (message == null || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无错误信息')),
+      );
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('节点错误原因'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _runSpeedTest({bool force = false}) async {
@@ -583,44 +659,125 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                 itemCount: nodes.length,
                 itemBuilder: (context, index) {
                   final node = nodes[index];
-                  final selected = _selectedNode?.id == node.id;
-                  final best = bestNode?.id == node.id;
-                  final available = node.available && _isLoggedIn;
-                  final titleStyle =
-                      available ? null : const TextStyle(color: Colors.grey);
-                  final errorLabel = _describeTestError(node.testError);
-                  final subtitle = available
-                      ? Text(node.type.toUpperCase())
-                      : (node.testedAt == null && _isTesting)
-                          ? const Text('测速中…', style: TextStyle(color: Colors.grey))
-                          : Tooltip(
-                              message: _isLoggedIn
-                                  ? (node.testError == null
-                                      ? '该节点当前无法连接，请稍后重试'
-                                      : '测速失败：$errorLabel')
-                                  : '请先登录',
+                  final isSelected = _selectedNode?.id == node.id;
+                  final isUnavailable = node.health == NodeHealth.unavailable;
+                  final isTestingNode = node.health == NodeHealth.testing;
+                  final best = bestNode?.id == node.id &&
+                      node.health != NodeHealth.unavailable;
+                  final titleStyle = isUnavailable
+                      ? const TextStyle(color: Colors.grey)
+                      : null;
+                  final errorLabel = _describeTestError(node.lastError);
+                  final subtitle = isTestingNode
+                      ? const Text('测速中…', style: TextStyle(color: Colors.grey))
+                      : isUnavailable
+                          ? Tooltip(
+                              message: node.lastError == null
+                                  ? '该节点当前无法连接，请稍后重试'
+                                  : '测速失败：$errorLabel',
                               child: const Text(
                                 '不可用',
                                 style: TextStyle(color: Colors.redAccent),
                               ),
-                            );
-                  return ListTile(
-                    selected: selected,
-                    title: Text(node.displayName, style: titleStyle),
-                    subtitle: subtitle,
-                    trailing: _LatencyBadge(node: node, isBest: best),
-                    onTap: available
-                        ? () => _selectNode(node)
-                        : () {
-                            final msg = _isLoggedIn
-                                ? (node.testError == null
-                                    ? '该节点当前不可用，请稍后重试。'
-                                    : '该节点当前不可用：$errorLabel')
-                                : '请先登录';
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(msg)),
-                            );
-                          },
+                            )
+                          : Text(node.type.toUpperCase());
+
+                  return Opacity(
+                    opacity: isUnavailable ? 0.45 : 1,
+                    child: InkWell(
+                      onTap: () => _handleNodeTap(node),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.appPrimaryColor.withValues(alpha: 0.08)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 3,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.appPrimaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            Expanded(
+                              child: ListTile(
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        node.displayName,
+                                        style: titleStyle,
+                                      ),
+                                    ),
+                                    if (best)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.appPrimaryColor
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          '推荐',
+                                          style: TextStyle(fontSize: 10),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                subtitle: subtitle,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _HealthIndicator(node: node),
+                                    const SizedBox(width: 6),
+                                    PopupMenuButton<String>(
+                                      tooltip: '更多',
+                                      onSelected: (value) {
+                                        if (value == 'retest') {
+                                          _retestNode(node);
+                                        } else if (value == 'copy') {
+                                          _copyNodeName(node);
+                                        } else if (value == 'error') {
+                                          _showNodeError(node);
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'retest',
+                                          child: Text('重新测速'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'copy',
+                                          child: Text('复制节点名'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'error',
+                                          child: Text('查看错误原因'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   );
                 },
               ),
@@ -999,6 +1156,16 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                     if (state == ConnectionStatus.connected) {
                       await widget.controller.disconnect(userInitiated: true);
                     } else {
+                      if (_selectedNode == null) {
+                        final pick = NodeSelector.pickBest(_controller.vpnServers) ??
+                            _controller.vpnServers.firstWhere(
+                              (n) => n.health != NodeHealth.unavailable,
+                              orElse: () => _controller.vpnServers.first,
+                            );
+                        setState(() {
+                          _selectedNode = pick;
+                        });
+                      }
                       await _connectSelected();
                     }
                   }
@@ -1046,58 +1213,33 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   }
 }
 
-class _LatencyBadge extends StatelessWidget {
+class _HealthIndicator extends StatelessWidget {
   final ProxyNode node;
-  final bool isBest;
 
-  const _LatencyBadge({required this.node, required this.isBest});
-
-  String _labelForError(String? error) {
-    switch (error) {
-      case 'timeout':
-        return '超时';
-      case 'handshake_failed':
-        return '握手失败';
-      case 'config_error':
-        return '配置错误';
-      case 'latency_missing':
-        return '无延迟';
-      case 'unavailable':
-        return '不可用';
-      default:
-        return '不可用';
-    }
-  }
+  const _HealthIndicator({required this.node});
 
   @override
   Widget build(BuildContext context) {
-    if (!node.available || node.latencyMs == null) {
-      if (node.testedAt == null) {
-        return const Text(
-          '测速中…',
-          style: TextStyle(color: Colors.grey),
+    switch (node.health) {
+      case NodeHealth.testing:
+        return const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
         );
-      }
-      final label = _labelForError(node.testError);
-      return Text(label, style: const TextStyle(color: Colors.redAccent));
+      case NodeHealth.unknown:
+        return const Text('—', style: TextStyle(color: Colors.grey));
+      case NodeHealth.unavailable:
+        return const Icon(Icons.signal_cellular_off, color: Colors.redAccent);
+      case NodeHealth.poor:
+        return const Icon(Icons.signal_cellular_1_bar, color: Colors.orange);
+      case NodeHealth.fair:
+        return const Icon(Icons.signal_cellular_2_bar, color: Colors.yellow);
+      case NodeHealth.good:
+        return const Icon(Icons.signal_cellular_3_bar, color: Colors.lightGreen);
+      case NodeHealth.excellent:
+        return const Icon(Icons.signal_cellular_4_bar, color: Colors.green);
     }
-
-    final displayMs = node.tlsMs ?? node.tcpMs ?? node.latencyMs!;
-    final isTls = node.tlsMs != null;
-    final labelPrefix = isTls ? 'TLS' : 'TCP';
-    final latency = displayMs < 10 ? 10 : displayMs;
-    Color color;
-    if (latency < 150) {
-      color = Colors.green;
-    } else if (latency < 300) {
-      color = Colors.orange;
-    } else {
-      color = Colors.redAccent;
-    }
-
-    final valueLabel = displayMs < 10 ? '≤10ms' : '$latency ms';
-    final label = isBest ? '$labelPrefix $valueLabel (Best)' : '$labelPrefix $valueLabel';
-    return Text(label, style: TextStyle(color: color));
   }
 }
 
