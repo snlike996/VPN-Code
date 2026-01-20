@@ -14,7 +14,7 @@
 #endif
 
 #ifndef AppIconFile
-  #define AppIconFile "..\\windows\\runner\\resources\\app_icon.ico"
+  #define AppIconFile "..\\..\\windows\\runner\\resources\\app_icon.ico"
 #endif
 
 #ifndef WizardSmallImageFile
