@@ -18,6 +18,7 @@ class ApiErrorHandler {
               break;
             case DioExceptionType.unknown:
               errorDescription =
+              error.error?.toString() ??
               "Connection to server failed due to internet connection ";
               break;
             case DioExceptionType.receiveTimeout:

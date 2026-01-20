@@ -63,8 +63,10 @@ class DioClient {
       dio!.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final httpClient = HttpClient();
-          // Avoid inheriting stale system proxy settings on desktop.
-          httpClient.findProxy = (_) => 'DIRECT';
+          // Avoid inheriting stale local proxy settings on desktop.
+          if (_shouldBypassProxyOnDesktop()) {
+            httpClient.findProxy = (_) => 'DIRECT';
+          }
           // Allow pinned certificates on desktop as well (fallback for non-standard chains).
           httpClient.badCertificateCallback =
               (X509Certificate cert, String host, int port) {
@@ -89,6 +91,62 @@ class DioClient {
       };
 
     dio!.interceptors.add(loggingInterceptor);
+  }
+
+  static const String _windowsProxyKey =
+      r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
+
+  static bool _shouldBypassProxyOnDesktop() {
+    if (!Platform.isWindows) {
+      return false;
+    }
+    try {
+      final proxyEnable = _queryRegDword('ProxyEnable') ?? 0;
+      final proxyServer = _queryRegString('ProxyServer');
+      final autoConfigUrl = _queryRegString('AutoConfigURL');
+      if (proxyEnable == 1 && _isLocalProxy(proxyServer)) {
+        return true;
+      }
+      if (_isLocalProxy(autoConfigUrl)) {
+        return true;
+      }
+    } catch (_) {
+      // Ignore and fall back to system settings.
+    }
+    return false;
+  }
+
+  static bool _isLocalProxy(String? value) {
+    if (value == null || value.isEmpty) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.contains('127.0.0.1') || lower.contains('localhost');
+  }
+
+  static String? _queryRegString(String name) {
+    final result =
+        Process.runSync('reg', ['query', _windowsProxyKey, '/v', name]);
+    if (result.exitCode != 0) {
+      return null;
+    }
+    final output = result.stdout.toString();
+    final pattern = '${RegExp.escape(name)}\\s+REG_\\w+\\s+(.+)\\\$';
+    final regex = RegExp(pattern, multiLine: true);
+    final match = regex.firstMatch(output);
+    return match?.group(1)?.trim();
+  }
+
+  static int? _queryRegDword(String name) {
+    final value = _queryRegString(name);
+    if (value == null) {
+      return null;
+    }
+    final cleaned = value.trim();
+    if (cleaned.startsWith('0x')) {
+      return int.tryParse(cleaned.substring(2), radix: 16);
+    }
+    return int.tryParse(cleaned);
   }
 
   // Helper to calculate the SHA256 fingerprint string from DER bytes
