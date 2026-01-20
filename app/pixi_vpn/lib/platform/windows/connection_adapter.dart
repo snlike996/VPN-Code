@@ -7,6 +7,7 @@ import '../../core/singbox/singbox_config_service.dart';
 import 'pac_server.dart';
 import 'system_proxy.dart';
 import 'vpn_process.dart';
+import 'singbox_worker.dart';
 
 class WindowsConnectionAdapter implements ConnectionAdapter {
   WindowsConnectionAdapter({
@@ -23,14 +24,12 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
 
   final WindowsSingBoxService vpnManager;
   final SingboxConfigService? singboxService;
-  final WindowsSystemProxy systemProxy = WindowsSystemProxy();
   final PacServer pacServer = PacServer();
 
   ProxyMode proxyMode = ProxyMode.pac;
   bool restoreProxyOnDisconnect = true;
   int? localProxyPort;
 
-  SystemProxySnapshot? _snapshot;
   StreamSubscription<void>? _exitSubscription;
   StreamSubscription<String>? _noticeSubscription;
   final StreamController<void> _unexpectedDisconnectController =
@@ -50,24 +49,20 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
 
   @override
   Future<void> connect(ProxyNode node) async {
-    _snapshot ??= await systemProxy.readCurrentProxy();
-
     try {
       if (singboxService == null) {
         localProxyPort ??= await _pickFreePort();
-        await vpnManager.connect(node, localProxyPort: localProxyPort!);
+        final proxySettings = await _buildProxySettings(localProxyPort!);
+        await vpnManager.connect(
+          node,
+          localProxyPort: localProxyPort!,
+          proxySettings: proxySettings,
+        );
       } else {
         await _connectWithSingboxConfigs(node);
       }
-      try {
-        await _applyProxy();
-      } catch (e) {
-        await vpnManager.disconnect();
-        await _restoreProxy();
-        rethrow;
-      }
     } catch (e) {
-      await _restoreProxy();
+      await _stopPacIfNeeded();
       rethrow;
     }
   }
@@ -75,8 +70,7 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
   @override
   Future<void> disconnect() async {
     await vpnManager.disconnect();
-    await _restoreProxy();
-    await pacServer.stop();
+    await _stopPacIfNeeded();
   }
 
   @override
@@ -88,39 +82,28 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
     await _configNoticeController.close();
   }
 
-  Future<void> _applyProxy() async {
-    final snapshot = _snapshot;
-    if (snapshot == null) {
-      return;
-    }
-
+  Future<ProxySettings> _buildProxySettings(int port) async {
     if (proxyMode == ProxyMode.off) {
-      return;
-    }
-
-    final port = localProxyPort ?? 7890;
-    if (proxyMode == ProxyMode.global) {
-      await systemProxy.setProxyGlobal(
-        host: '127.0.0.1',
+      return ProxySettings(
+        mode: ProxyMode.off.name,
         port: port,
-        snapshot: snapshot,
+        restoreOnDisconnect: restoreProxyOnDisconnect,
       );
-      return;
     }
-
+    if (proxyMode == ProxyMode.global) {
+      return ProxySettings(
+        mode: ProxyMode.global.name,
+        port: port,
+        restoreOnDisconnect: restoreProxyOnDisconnect,
+      );
+    }
     final pacUrl = await pacServer.start(proxyPort: port);
-    await systemProxy.setProxyPac(pacUrl: pacUrl, snapshot: snapshot);
-  }
-
-  Future<void> _restoreProxy() async {
-    if (!restoreProxyOnDisconnect) {
-      return;
-    }
-    final snapshot = _snapshot;
-    if (snapshot == null) {
-      return;
-    }
-    await systemProxy.setProxyOff(snapshot: snapshot);
+    return ProxySettings(
+      mode: ProxyMode.pac.name,
+      port: port,
+      pacUrl: pacUrl.toString(),
+      restoreOnDisconnect: restoreProxyOnDisconnect,
+    );
   }
 
   Future<int> _pickFreePort() async {
@@ -147,9 +130,15 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
 
     for (final config in configs) {
       try {
-        final result = await service.prepareConfig(config);
-        localProxyPort = result.proxyPort ?? localProxyPort ?? 7890;
-        await vpnManager.connectWithConfig(result.path, node: node);
+        final content = await service.resolveContent(config);
+        localProxyPort =
+            service.parseProxyPort(content) ?? localProxyPort ?? 7890;
+        final proxySettings = await _buildProxySettings(localProxyPort!);
+        await vpnManager.connectWithConfig(
+          content,
+          node: node,
+          proxySettings: proxySettings,
+        );
         activeConfig = config;
         if (config != configs.first) {
           _configNoticeController.add(
@@ -164,5 +153,9 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
     }
 
     throw StateError(lastConfigError ?? 'All sing-box configs failed');
+  }
+
+  Future<void> _stopPacIfNeeded() async {
+    await pacServer.stop();
   }
 }

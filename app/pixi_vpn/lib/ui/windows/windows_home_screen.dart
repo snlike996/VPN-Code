@@ -15,12 +15,10 @@ import '../../core/models/proxy_node.dart';
 import '../../core/selector/node_selector.dart';
 import '../../core/speedtest/windows_real_tester.dart';
 import '../../utils/app_colors.dart';
-import '../../platform/windows/admin_check.dart';
 import '../../platform/windows/autostart.dart';
 import '../../platform/windows/connection_adapter.dart';
 import '../../platform/windows/system_proxy.dart';
 import '../../platform/windows/tray_service.dart';
-import '../../platform/windows/privilege_helper.dart';
 import 'dialogs/login_dialog.dart';
 import 'dialogs/profile_dialog.dart';
 import 'dialogs/settings_dialog.dart';
@@ -62,12 +60,16 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   Timer? _autoConnectTimer;
   StreamSubscription<String>? _notificationSubscription;
   StreamSubscription<String>? _configNoticeSubscription;
+  StreamSubscription<String>? _runtimeLogSubscription;
+  StreamSubscription<TrayAction>? _trayActionSubscription;
   bool _lastConnectFailed = false;
   int _reconnectFailureCount = 0;
   bool _isLoggedIn = false;
   String _userLabel = '登录';
   Timer? _testDebounce;
   int _testRunId = 0;
+  final List<String> _runtimeLogs = <String>[];
+  static const int _maxRuntimeLogs = 400;
 
   @override
   void initState() {
@@ -77,12 +79,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     _refreshAuthState();
     _silentLaunch = widget.launchOptions.silent || widget.launchOptions.autoConnect;
 
-    _trayService = WindowsTrayService(
-      onToggleConnection: _toggleConnection,
-      onExit: _exitApp,
-      onSelectNode: _selectNode,
-    );
+    _trayService = WindowsTrayService();
     Future<void>.microtask(_trayService.init);
+    _trayActionSubscription = _trayService.actions.listen(_handleTrayAction);
 
     windowManager.addListener(this);
     windowManager.setPreventClose(true);
@@ -93,14 +92,12 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         widget.controller.notifications.listen(_handleNotification);
     _configNoticeSubscription =
         widget.adapter.configNotices.listen(_handleConfigNotice);
+    _runtimeLogSubscription =
+        widget.adapter.vpnManager.logs.listen(_handleRuntimeLog);
     _loadSettings();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!WindowsPrivilege.isAdmin()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Run as administrator to enable VPN/TUN.')),
-        );
-      }
+      _checkAdminStatus();
     });
   }
 
@@ -110,6 +107,8 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     _autoConnectTimer?.cancel();
     _notificationSubscription?.cancel();
     _configNoticeSubscription?.cancel();
+    _runtimeLogSubscription?.cancel();
+    _trayActionSubscription?.cancel();
     _testRunId++;
     widget.controller.status.removeListener(_syncTrayState);
     widget.controller.status.removeListener(_handleStatusChange);
@@ -133,6 +132,39 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     await windowManager.destroy();
   }
 
+  Future<void> _handleTrayAction(TrayAction action) async {
+    if (!mounted) {
+      return;
+    }
+    switch (action.type) {
+      case TrayActionType.toggleConnection:
+        await _toggleConnection();
+        break;
+      case TrayActionType.showWindow:
+        await windowManager.show();
+        await windowManager.focus();
+        break;
+      case TrayActionType.exitApp:
+        await _exitApp();
+        break;
+      case TrayActionType.selectNode:
+        final node = action.node;
+        if (node != null) {
+          _selectNode(node);
+        }
+        break;
+      case TrayActionType.toggleWindow:
+        final isVisible = await windowManager.isVisible();
+        if (isVisible) {
+          await windowManager.hide();
+        } else {
+          await windowManager.show();
+          await windowManager.focus();
+        }
+        break;
+    }
+  }
+
   Future<void> _handleEscape() async {
     if (_closeToTray) {
       await _showTrayHintIfNeeded();
@@ -146,6 +178,11 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     if (widget.controller.status.value == ConnectionStatus.connected ||
         widget.controller.status.value == ConnectionStatus.starting ||
         widget.controller.status.value == ConnectionStatus.reconnecting) {
+      if (widget.controller.status.value == ConnectionStatus.starting ||
+          widget.controller.status.value == ConnectionStatus.reconnecting ||
+          widget.controller.status.value == ConnectionStatus.stopping) {
+        return;
+      }
       await widget.controller.disconnect(userInitiated: true);
       setState(() {
         _lastConnectFailed = false;
@@ -167,10 +204,97 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     );
   }
 
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await widget.adapter.vpnManager.isAdmin();
+    if (!mounted || isAdmin) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Run as administrator to enable VPN/TUN.')),
+    );
+  }
+
+  void _handleRuntimeLog(String line) {
+    _runtimeLogs.add(line);
+    if (_runtimeLogs.length > _maxRuntimeLogs) {
+      _runtimeLogs.removeRange(0, _runtimeLogs.length - _maxRuntimeLogs);
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _showRuntimeLogs() async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('运行日志'),
+          content: SizedBox(
+            width: 720,
+            height: 420,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Scrollbar(
+                child: ListView.builder(
+                  itemCount: _runtimeLogs.length,
+                  itemBuilder: (context, index) {
+                    return Text(
+                      _runtimeLogs[index],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.greenAccent,
+                        fontFamily: 'Consolas',
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final content = _runtimeLogs.join('\n');
+                await Clipboard.setData(ClipboardData(text: content));
+              },
+              child: const Text('复制'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _connectSelected() async {
     final node = _selectedNode;
     if (node == null) {
       return;
+    }
+    if (widget.controller.status.value == ConnectionStatus.starting ||
+        widget.controller.status.value == ConnectionStatus.reconnecting ||
+        widget.controller.status.value == ConnectionStatus.stopping) {
+      return;
+    }
+    if (_isTesting) {
+      _testRunId++;
+      await WindowsRealTester.cancelPendingTests();
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+        });
+      }
     }
     if (!_isLoggedIn) {
       if (mounted) {
@@ -203,7 +327,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       }
       return;
     }
-    if (_dnsProtect && !WindowsAdminCheck.isAdmin()) {
+    if (_dnsProtect && !(await widget.adapter.vpnManager.isAdmin())) {
       if (!_silentLaunch) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('DNS 防泄漏需要管理员权限。')),
@@ -287,6 +411,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     if (_isTesting) {
       return;
     }
+    if (widget.controller.status.value != ConnectionStatus.idle) {
+      return;
+    }
     await WindowsRealTester.clearCacheFor([node]);
     await _runSpeedTest();
   }
@@ -331,6 +458,9 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     if (_controller.vpnServers.isEmpty) {
       return;
     }
+    if (widget.controller.status.value != ConnectionStatus.idle) {
+      return;
+    }
     final runId = ++_testRunId;
     setState(() {
       _isTesting = true;
@@ -343,6 +473,16 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       final sorted = await WindowsRealTester.testAndSort(
         _controller.vpnServers,
         timeout: const Duration(seconds: 8),
+        onProgress: (working) {
+          if (!mounted || runId != _testRunId) {
+            return;
+          }
+          _controller.setVpnServers(working);
+          if (updateSelection) {
+            _selectedNode ??= NodeSelector.pickBest(working);
+          }
+          _syncTrayState();
+        },
       );
       if (!mounted || runId != _testRunId) {
         return;
@@ -577,7 +717,15 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
               // 1. Connection status display (read-only)
               _buildConnectionStatusIndicator(),
               const SizedBox(width: 16),
-              
+
+              // 1.5 Runtime logs
+              IconButton(
+                tooltip: '运行日志',
+                onPressed: _showRuntimeLogs,
+                icon: const Icon(Icons.article_outlined),
+              ),
+              const SizedBox(width: 8),
+
               // 2. Login/Profile button
               _buildUserButton(),
               const SizedBox(width: 8),
@@ -1162,7 +1310,12 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   Widget _buildConnectAction() {
     final isConnected =
         widget.controller.status.value == ConnectionStatus.connected;
-    final connectDisabled = _isLoggedIn && _isTesting && !isConnected;
+    final isBusy = widget.controller.status.value == ConnectionStatus.starting ||
+        widget.controller.status.value == ConnectionStatus.reconnecting ||
+        widget.controller.status.value == ConnectionStatus.stopping;
+    final connectDisabled = isBusy;
+    final speedTestDisabled =
+        _isTesting || isBusy || widget.controller.status.value == ConnectionStatus.connected;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -1173,11 +1326,13 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                 : _isLoggedIn
                 ? () async {
                     final state = widget.controller.status.value;
-                    if (state == ConnectionStatus.connected) {
-                      await widget.controller.disconnect(userInitiated: true);
+                    if (state == ConnectionStatus.starting ||
+                        state == ConnectionStatus.reconnecting ||
+                        state == ConnectionStatus.stopping) {
                       return;
                     }
-                    if (_isTesting) {
+                    if (state == ConnectionStatus.connected) {
+                      await widget.controller.disconnect(userInitiated: true);
                       return;
                     }
                     if (_selectedNode == null) {
@@ -1202,7 +1357,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
           ),
           const SizedBox(width: 12),
           OutlinedButton.icon(
-            onPressed: _isTesting
+            onPressed: speedTestDisabled
                 ? null
                 : () => _runSpeedTest(force: true, updateSelection: false),
             icon: _isTesting
@@ -1318,6 +1473,10 @@ String _describeTestError(String? error) {
       return '未找到 sing-box 内核';
     case 'singbox_failed':
       return 'sing-box 启动失败';
+    case 'busy':
+      return '当前忙碌';
+    case 'canceled':
+      return '已取消';
     case 'latency_missing':
       return '无延迟';
     case 'unavailable':

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/utils/crash_guard.dart';
 import 'di_container.dart' as di;
 import 'ui/windows/windows_app.dart';
 import 'platform/windows/startup_args.dart';
@@ -36,5 +37,7 @@ Future<void> bootstrap() async {
 }
 
 Future<void> main() async {
-  await bootstrap();
+  await CrashGuard.run(() async {
+    await bootstrap();
+  });
 }

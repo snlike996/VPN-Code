@@ -1,17 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/models/proxy_node.dart';
-import 'core_binary.dart';
-import 'privilege_helper.dart';
-import 'firewall.dart';
-import 'dns_protect.dart';
-import 'tun_adapter.dart';
-import 'vpn_config_builder.dart';
+import 'singbox_worker.dart';
+import 'system_proxy.dart';
 
 enum WindowsVpnState { stopped, starting, running, stopping, failed }
 
@@ -19,8 +12,6 @@ class WindowsSingBoxService {
   WindowsSingBoxService({this.autoRestart = false});
 
   final bool autoRestart;
-  static const int _maxRestartAttempts = 3;
-  static const Duration _restartBaseDelay = Duration(seconds: 2);
 
   final ValueNotifier<WindowsVpnState> state =
       ValueNotifier<WindowsVpnState>(WindowsVpnState.stopped);
@@ -29,69 +20,60 @@ class WindowsSingBoxService {
       StreamController<String>.broadcast();
   final StreamController<void> _unexpectedExitController =
       StreamController<void>.broadcast();
-  final WindowsTunAdapter _tunAdapter = WindowsTunAdapter();
-  final WindowsFirewall _firewall = WindowsFirewall();
-  final WindowsDnsProtect _dnsProtect = WindowsDnsProtect();
   bool dnsProtectionEnabled = true;
 
-  Process? _process;
   ProxyNode? _currentNode;
-  String? _currentConfigPath;
   int? _lastProxyPort;
-  bool _shouldRestart = false;
-  int _restartAttempts = 0;
-  bool _userInitiatedStop = false;
-  IOSink? _runtimeLogSink;
+  final SingBoxWorkerClient _worker = SingBoxWorkerClient.instance;
+  bool _workerBound = false;
 
   Stream<String> get logs => _logs.stream;
   Stream<String> get notices => _notices.stream;
   Stream<void> get unexpectedExitStream => _unexpectedExitController.stream;
   ProxyNode? get currentNode => _currentNode;
   WindowsVpnState get status => state.value;
-  int? get pid => _process?.pid;
   bool get isRunning => state.value == WindowsVpnState.running;
   bool get isCrashed => state.value == WindowsVpnState.failed;
+  ValueNotifier<SingBoxWorkerState> get workerState => _worker.state;
 
-  Future<void> connect(ProxyNode node, {int? localProxyPort}) async {
-    if (!WindowsPrivilege.isAdmin()) {
-      throw StateError('Administrator privileges required for VPN/TUN');
-    }
+  Future<bool> isAdmin() async {
+    await _worker.ensureInitialized(autoRestart: autoRestart);
+    _bindWorker();
+    return _worker.isAdmin();
+  }
 
+  Future<void> connect(
+    ProxyNode node, {
+    int? localProxyPort,
+    ProxySettings? proxySettings,
+  }) async {
     if (state.value == WindowsVpnState.starting ||
         state.value == WindowsVpnState.running) {
       return;
     }
-
-    _shouldRestart = autoRestart;
-    _userInitiatedStop = false;
     _currentNode = node;
-    _currentConfigPath = null;
     _lastProxyPort = localProxyPort;
     state.value = WindowsVpnState.starting;
 
     try {
-      await _tunAdapter.ensureReady();
-      await _firewall.applyRules();
-      final coreFile = await WindowsCoreBinary.ensureCoreBinary();
-      final config = WindowsVpnConfigBuilder.build(
-        node,
-        localProxyPort: localProxyPort,
+      await _worker.ensureInitialized(autoRestart: autoRestart);
+      _bindWorker();
+      final settings = proxySettings ??
+          ProxySettings(
+            mode: ProxyMode.off.name,
+            port: localProxyPort ?? 7890,
+            restoreOnDisconnect: true,
+          );
+      _lastProxyPort = settings.port;
+      final result = await _worker.startWithNode(
+        node: node,
+        proxySettings: settings,
+        dnsProtectionEnabled: dnsProtectionEnabled,
       );
-      final configPath = await _writeConfig(config);
-
-      final ready = await _startProcess(coreFile.path, configPath);
-      await _waitForReady(ready);
+      if (result['ok'] != true) {
+        throw StateError(result['error']?.toString() ?? 'start_failed');
+      }
       state.value = WindowsVpnState.running;
-      if (_restartAttempts > 0) {
-        _notices.add('已自动重连');
-      }
-      if (dnsProtectionEnabled) {
-        try {
-          await _dnsProtect.enable();
-        } catch (e) {
-          _logs.add('DNS protection failed: $e');
-        }
-      }
     } catch (e) {
       state.value = WindowsVpnState.failed;
       _logs.add('VPN start failed: $e');
@@ -99,40 +81,40 @@ class WindowsSingBoxService {
     }
   }
 
-  Future<void> connectWithConfig(String configPath, {ProxyNode? node}) async {
-    if (!WindowsPrivilege.isAdmin()) {
-      throw StateError('Administrator privileges required for VPN/TUN');
-    }
-
+  Future<void> connectWithConfig(
+    String configContent, {
+    ProxyNode? node,
+    ProxySettings? proxySettings,
+  }) async {
     if (state.value == WindowsVpnState.starting ||
         state.value == WindowsVpnState.running) {
       return;
     }
 
-    _shouldRestart = autoRestart;
-    _userInitiatedStop = false;
     _currentNode = node;
-    _currentConfigPath = configPath;
     state.value = WindowsVpnState.starting;
 
     try {
-      await _tunAdapter.ensureReady();
-      await _firewall.applyRules();
-      final coreFile = await WindowsCoreBinary.ensureCoreBinary();
-
-      final ready = await _startProcess(coreFile.path, configPath);
-      await _waitForReady(ready);
+      await _worker.ensureInitialized(autoRestart: autoRestart);
+      _bindWorker();
+      final settings = proxySettings ??
+          ProxySettings(
+            mode: ProxyMode.off.name,
+            port: _lastProxyPort ?? 7890,
+            restoreOnDisconnect: true,
+          );
+      _lastProxyPort = settings.port;
+      final result = await _worker.startWithConfig(
+        configContent: configContent,
+        proxySettings: settings,
+        dnsProtectionEnabled: dnsProtectionEnabled,
+        nodeRaw: node?.raw,
+        nodeName: node?.displayName,
+      );
+      if (result['ok'] != true) {
+        throw StateError(result['error']?.toString() ?? 'start_failed');
+      }
       state.value = WindowsVpnState.running;
-      if (_restartAttempts > 0) {
-        _notices.add('已自动重连');
-      }
-      if (dnsProtectionEnabled) {
-        try {
-          await _dnsProtect.enable();
-        } catch (e) {
-          _logs.add('DNS protection failed: $e');
-        }
-      }
     } catch (e) {
       state.value = WindowsVpnState.failed;
       _logs.add('VPN start failed: $e');
@@ -141,182 +123,47 @@ class WindowsSingBoxService {
   }
 
   Future<void> disconnect() async {
-    _shouldRestart = false;
-    _userInitiatedStop = true;
-    _restartAttempts = 0;
-
-    if (_process == null) {
-      state.value = WindowsVpnState.stopped;
-      return;
-    }
-
     state.value = WindowsVpnState.stopping;
-    _process?.kill(ProcessSignal.sigterm);
-    _process = null;
-    await _runtimeLogSink?.flush();
-    await _runtimeLogSink?.close();
-    _runtimeLogSink = null;
-    if (dnsProtectionEnabled) {
-      try {
-        await _dnsProtect.restore();
-      } catch (e) {
-        _logs.add('DNS restore failed: $e');
-      }
+    try {
+      await _worker.ensureInitialized(autoRestart: autoRestart);
+      _bindWorker();
+      await _worker.stop();
+    } catch (e) {
+      _logs.add('VPN stop failed: $e');
     }
-    await _firewall.clearRules();
     state.value = WindowsVpnState.stopped;
   }
 
   Future<void> restart() async {
     final node = _currentNode;
-    final configPath = _currentConfigPath;
-    if (node == null && configPath == null) {
+    if (node == null) {
       return;
     }
     await disconnect();
-    if (configPath != null) {
-      await connectWithConfig(configPath, node: node);
-    } else if (node != null) {
-      await connect(node, localProxyPort: _lastProxyPort);
-    }
+    await connect(node, localProxyPort: _lastProxyPort);
   }
 
   Future<void> dispose() async {
-    _shouldRestart = false;
-    _restartAttempts = 0;
-    _process?.kill(ProcessSignal.sigterm);
-    _process = null;
-    await _runtimeLogSink?.flush();
-    await _runtimeLogSink?.close();
-    _runtimeLogSink = null;
+    await disconnect();
     await _logs.close();
     await _notices.close();
     await _unexpectedExitController.close();
   }
 
-  Future<String> _writeConfig(String content) async {
-    final supportDir = await getApplicationSupportDirectory();
-    final configDir = Directory('${supportDir.path}\\config');
-    await configDir.create(recursive: true);
-    final configFile = File('${configDir.path}\\sing-box.json');
-    await configFile.writeAsString(content, flush: true);
-    return configFile.path;
-  }
-
-  void _handleExit(int exitCode) {
-    _process = null;
-
-    if (_shouldRestart && _currentNode != null) {
-      if (_restartAttempts >= _maxRestartAttempts) {
-        _logs.add('VPN restart limit reached');
-        state.value = WindowsVpnState.failed;
-        if (!_userInitiatedStop) {
-          _unexpectedExitController.add(null);
-        }
-        return;
-      }
-      _restartAttempts += 1;
-      _logs.add('VPN exited ($exitCode), restarting...');
-      _notices.add('检测到异常，正在自动重连…');
-      final delaySeconds =
-          _restartBaseDelay.inSeconds * (1 << (_restartAttempts - 1));
-      Future<void>.delayed(Duration(seconds: delaySeconds), () async {
-        if (!_shouldRestart || _currentNode == null) {
-          return;
-        }
-        try {
-          if (_currentConfigPath != null) {
-            await connectWithConfig(_currentConfigPath!, node: _currentNode);
-          } else {
-            await connect(_currentNode!);
-          }
-        } catch (_) {
-          // connect handles state/logging
-        }
-      });
+  void _bindWorker() {
+    if (_workerBound) {
       return;
     }
-
-    if (dnsProtectionEnabled) {
-      _dnsProtect.restore().catchError((e) {
-        _logs.add('DNS restore failed: $e');
-      });
-    }
-    state.value =
-        _userInitiatedStop ? WindowsVpnState.stopped : WindowsVpnState.failed;
-    if (!_userInitiatedStop) {
+    _workerBound = true;
+    _worker.logs.listen(_logs.add);
+    _worker.notices.listen(_notices.add);
+    _worker.unexpectedExitStream.listen((_) {
       _unexpectedExitController.add(null);
-    }
+      state.value = WindowsVpnState.failed;
+    });
   }
 
-  Future<_ProcessReady> _startProcess(String exePath, String configPath) async {
-    await _initRuntimeLogger();
-    _process = await Process.start(
-      exePath,
-      ['run', '-c', configPath],
-      workingDirectory: File(exePath).parent.path,
-      runInShell: false,
-    );
-
-    final ready = _ProcessReady();
-    _process?.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((line) => _handleLogLine(line, ready));
-    _process?.stderr
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((line) => _handleLogLine(line, ready));
-
-    _process?.exitCode.then(_handleExit);
-    return ready;
-  }
-
-  Future<void> _waitForReady(_ProcessReady ready) async {
-    final process = _process;
-    if (process == null) {
-      throw StateError('sing-box not started');
-    }
-    final completed = await Future.any<bool>([
-      ready.ready,
-      process.exitCode.then((_) => false),
-    ]).timeout(
-      const Duration(seconds: 8),
-      onTimeout: () => false,
-    );
-    if (!completed) {
-      process.kill();
-      throw StateError('sing-box not ready: check logs/runtime.log');
-    }
-  }
-
-  void _handleLogLine(String line, _ProcessReady ready) {
-    _logs.add(line);
-    _runtimeLogSink?.writeln(line);
-    if (ready.isCompleted) {
-      return;
-    }
-    final lower = line.toLowerCase();
-    if (lower.contains('started') ||
-        lower.contains('tun') && lower.contains('listen') ||
-        lower.contains('inbound') && lower.contains('listening')) {
-      ready.complete();
-    }
-  }
-
-  Future<void> _initRuntimeLogger() async {
-    if (_runtimeLogSink != null) {
-      return;
-    }
-    final supportDir = await getApplicationSupportDirectory();
-    final logDir = Directory('${supportDir.path}\\logs');
-    if (!await logDir.exists()) {
-      await logDir.create(recursive: true);
-    }
-    final logFile = File('${logDir.path}\\runtime.log');
-    _runtimeLogSink = logFile.openWrite(mode: FileMode.append);
-    _runtimeLogSink?.writeln('--- ${DateTime.now().toIso8601String()} start ---');
-  }
+  // Worker receives raw config content, no file IO here.
 }
 
 @Deprecated('Use WindowsSingBoxService instead.')
@@ -324,14 +171,4 @@ class WindowsVpnManager extends WindowsSingBoxService {
   WindowsVpnManager({super.autoRestart});
 }
 
-class _ProcessReady {
-  final Completer<bool> _completer = Completer<bool>();
-  bool get isCompleted => _completer.isCompleted;
-  Future<bool> get ready => _completer.future;
-
-  void complete() {
-    if (!_completer.isCompleted) {
-      _completer.complete(true);
-    }
-  }
-}
+// Worker handles process readiness; no local process state here.

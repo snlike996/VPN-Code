@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 class WindowsAutoStart {
   static const String _runKey =
@@ -9,7 +10,7 @@ class WindowsAutoStart {
     final exePath = Platform.resolvedExecutable;
     final args = autoConnect ? ' --silent --autoconnect' : ' --silent';
     final value = '"$exePath"$args';
-    final result = await Process.run('reg', [
+    final result = await _runReg([
       'add',
       _runKey,
       '/v',
@@ -26,7 +27,7 @@ class WindowsAutoStart {
   }
 
   static Future<void> disableAutoStart() async {
-    final result = await Process.run('reg', [
+    final result = await _runReg([
       'delete',
       _runKey,
       '/v',
@@ -42,7 +43,7 @@ class WindowsAutoStart {
   }
 
   static Future<bool> isAutoStartEnabled() async {
-    final result = await Process.run('reg', [
+    final result = await _runReg([
       'query',
       _runKey,
       '/v',
@@ -54,4 +55,27 @@ class WindowsAutoStart {
     final stdout = result.stdout.toString();
     return stdout.contains(_valueName);
   }
+
+  static Future<_RegResult> _runReg(List<String> args) async {
+    return Isolate.run(() async {
+      final result = await Process.run('reg', args);
+      return _RegResult(
+        exitCode: result.exitCode,
+        stdout: result.stdout?.toString() ?? '',
+        stderr: result.stderr?.toString() ?? '',
+      );
+    });
+  }
+}
+
+class _RegResult {
+  final int exitCode;
+  final String stdout;
+  final String stderr;
+
+  const _RegResult({
+    required this.exitCode,
+    required this.stdout,
+    required this.stderr,
+  });
 }

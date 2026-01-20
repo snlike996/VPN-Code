@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/proxy_node.dart';
-import '../../platform/windows/core_binary.dart';
-import '../../platform/windows/vpn_config_builder.dart';
+import '../../platform/windows/singbox_worker.dart';
 
 class SpeedTestResult {
   final bool available;
@@ -36,11 +34,12 @@ class SpeedTestResult {
 class WindowsRealTester {
   static const Duration _timeout = Duration(seconds: 8);
   static const Duration _cacheTtl = Duration(minutes: 5);
-  static const int _maxConcurrency = 5;
+  static const int _maxConcurrency = 3;
 
   static Future<List<ProxyNode>> testAndSort(
     List<ProxyNode> nodes, {
     Duration timeout = _timeout,
+    void Function(List<ProxyNode>)? onProgress,
   }) async {
     if (nodes.isEmpty) {
       return nodes;
@@ -68,6 +67,8 @@ class WindowsRealTester {
         final result = await testNode(node, timeout: timeout);
         _applyResult(node, result);
         await _writeCache(prefs, node.raw, result);
+        working.sort(_compareNodes);
+        onProgress?.call(List<ProxyNode>.from(working));
       });
     }
 
@@ -82,6 +83,16 @@ class WindowsRealTester {
     final prefs = await SharedPreferences.getInstance();
     for (final node in nodes) {
       await prefs.remove(_cacheKey(node.raw));
+    }
+  }
+
+  static Future<void> cancelPendingTests() async {
+    final worker = SingBoxWorkerClient.instance;
+    try {
+      await worker.ensureInitialized(autoRestart: false);
+      await worker.cancelPendingTests();
+    } catch (_) {
+      // Ignore cancellation errors.
     }
   }
 
@@ -256,10 +267,9 @@ class WindowsRealTester {
       return null;
     }
     final now = DateTime.now();
-    File? binary;
-    try {
-      binary = await WindowsCoreBinary.ensureCoreBinary();
-    } catch (_) {
+    final worker = SingBoxWorkerClient.instance;
+    await worker.ensureInitialized(autoRestart: false);
+    if (worker.state.value != SingBoxWorkerState.idle) {
       return SpeedTestResult(
         available: false,
         tcpMs: null,
@@ -267,19 +277,14 @@ class WindowsRealTester {
         scoreMs: 999999,
         jitterMs: null,
         testedAt: now,
-        error: 'singbox_not_found',
+        error: 'busy',
         exitCode: null,
       );
     }
-
-    final configDir = await _ensureTestConfigDir();
-    final configPath = File(
-      '${configDir.path}\\node_${_fnv1a(node.raw)}.json',
-    );
+    SingboxTestResult result;
     try {
-      final content = WindowsVpnConfigBuilder.buildTestConfig(node);
-      await configPath.writeAsString(content, flush: true);
-    } catch (_) {
+      result = await worker.testNode(node: node, timeout: timeout);
+    } catch (e) {
       return SpeedTestResult(
         available: false,
         tcpMs: null,
@@ -287,21 +292,10 @@ class WindowsRealTester {
         scoreMs: 999999,
         jitterMs: null,
         testedAt: now,
-        error: 'config_error',
+        error: 'process_error: $e',
         exitCode: null,
       );
     }
-
-    final stopwatch = Stopwatch()..start();
-    final result = await Isolate.run(
-      () async => _runSingboxTest(
-        binary!.path,
-        configPath.path,
-        timeout,
-      ),
-    );
-    stopwatch.stop();
-
     final latencyMs = result.latencyMs;
     final available = result.success && latencyMs != null;
     final error = available
@@ -320,94 +314,6 @@ class WindowsRealTester {
     );
   }
 
-  static Future<_SingboxResult> _runSingboxTest(
-    String exePath,
-    String configPath,
-    Duration timeout,
-  ) async {
-    final args = [
-      'test',
-      '-c',
-      configPath,
-      '--timeout',
-      '${timeout.inSeconds}s',
-    ];
-    final stdoutBuffer = StringBuffer();
-    final stderrBuffer = StringBuffer();
-    int? exitCode;
-    try {
-      final proc = await Process.start(
-        exePath,
-        args,
-        workingDirectory: File(exePath).parent.path,
-        runInShell: false,
-      );
-      proc.stdout.transform(utf8.decoder).listen(stdoutBuffer.write);
-      proc.stderr.transform(utf8.decoder).listen(stderrBuffer.write);
-      exitCode = await proc.exitCode.timeout(
-        timeout,
-        onTimeout: () {
-          proc.kill();
-          return -1;
-        },
-      );
-    } catch (e) {
-      return _SingboxResult(
-        success: false,
-        latencyMs: null,
-        error: 'process_error: $e',
-        exitCode: exitCode,
-      );
-    }
-
-    final output = '${stdoutBuffer.toString()}\n${stderrBuffer.toString()}';
-    final latency = _parseLatency(output);
-    final success = exitCode == 0;
-    String? error;
-    if (success) {
-      error = latency == null ? 'latency_missing' : null;
-    } else if (exitCode == -1) {
-      error = 'timeout';
-    } else {
-      error = _inferSingboxError(output);
-    }
-
-    return _SingboxResult(
-      success: success,
-      latencyMs: latency,
-      error: error,
-      exitCode: exitCode,
-      output: output,
-    );
-  }
-
-  static int? _parseLatency(String output) {
-    final match = RegExp(r'latency\\s*[:=]\\s*(\\d+)\\s*ms', caseSensitive: false)
-        .firstMatch(output);
-    if (match != null) {
-      return int.tryParse(match.group(1) ?? '');
-    }
-    final fallback = RegExp(r'(\\d+)\\s*ms', caseSensitive: false).firstMatch(output);
-    if (fallback != null) {
-      return int.tryParse(fallback.group(1) ?? '');
-    }
-    return null;
-  }
-
-  static String _inferSingboxError(String output) {
-    final lower = output.toLowerCase();
-    if (lower.contains('timeout')) {
-      return 'timeout';
-    }
-    if (lower.contains('handshake') || lower.contains('tls')) {
-      return 'handshake_failed';
-    }
-    if (lower.contains('config') || lower.contains('parse')) {
-      return 'config_error';
-    }
-    return 'unavailable';
-  }
-
   static String? _inferSocketError(bool isTls, int? tcpMs, int? tlsMs) {
     if (isTls && tlsMs == null) {
       return tcpMs == null ? 'timeout' : 'handshake_failed';
@@ -416,15 +322,6 @@ class WindowsRealTester {
       return 'timeout';
     }
     return null;
-  }
-
-  static Future<Directory> _ensureTestConfigDir() async {
-    final supportDir = await getApplicationSupportDirectory();
-    final dir = Directory('${supportDir.path}\\speedtest');
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    return dir;
   }
 
   static Future<void> _appendLog({
@@ -803,22 +700,6 @@ class _HostPort {
   final int port;
 
   _HostPort({required this.host, required this.port});
-}
-
-class _SingboxResult {
-  final bool success;
-  final int? latencyMs;
-  final String? error;
-  final int? exitCode;
-  final String? output;
-
-  _SingboxResult({
-    required this.success,
-    required this.latencyMs,
-    required this.error,
-    required this.exitCode,
-    this.output,
-  });
 }
 
 Future<void> _runWithConcurrency(

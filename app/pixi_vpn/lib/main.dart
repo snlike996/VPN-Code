@@ -5,29 +5,30 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:pixi_vpn/ui/shared/splash/splash_screen.dart';
+import 'package:pixi_vpn/core/utils/crash_guard.dart';
 import 'di_container.dart' as di;
 import 'main_windows.dart' as windows;
 
-void main() async{
-  WidgetsFlutterBinding.ensureInitialized();
-  if (GetPlatform.isWindows) {
-    await windows.bootstrap();
-    return;
-  }
-  if (GetPlatform.isAndroid || GetPlatform.isIOS) {
-    MobileAds.instance.initialize();
-  }
-  // Check if Firebase is already initialized
-  if (GetPlatform.isAndroid || GetPlatform.isIOS) {
-    await Firebase.initializeApp();
-  }
-  // Lock orientation to portrait
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-  await di.init();
-  runApp(const V2rayGuard());
+Future<void> main() async {
+  await CrashGuard.run(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (GetPlatform.isWindows) {
+      await windows.bootstrap();
+      return;
+    }
+    if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+      MobileAds.instance.initialize();
+    }
+    if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+      await Firebase.initializeApp();
+    }
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    await di.init();
+    runApp(const V2rayGuard());
+  });
 }
 
 class V2rayGuard extends StatelessWidget {

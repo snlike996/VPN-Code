@@ -4,25 +4,29 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../../core/models/proxy_node.dart';
 
-class WindowsTrayService with TrayListener {
-  WindowsTrayService({
-    required this.onToggleConnection,
-    required this.onExit,
-    required this.onSelectNode,
-  });
+enum TrayActionType { toggleConnection, showWindow, exitApp, selectNode, toggleWindow }
 
-  final Future<void> Function() onToggleConnection;
-  final Future<void> Function() onExit;
-  final Future<void> Function(ProxyNode node) onSelectNode;
+class TrayAction {
+  final TrayActionType type;
+  final ProxyNode? node;
+
+  const TrayAction(this.type, {this.node});
+}
+
+class WindowsTrayService with TrayListener {
+  WindowsTrayService();
 
   List<ProxyNode> _nodes = const [];
   ProxyNode? _current;
   bool _isConnected = false;
   Timer? _messageTimer;
+  final StreamController<TrayAction> _actions =
+      StreamController<TrayAction>.broadcast();
+
+  Stream<TrayAction> get actions => _actions.stream;
 
   Future<void> init() async {
     final iconPath = await _ensureTrayIcon();
@@ -50,17 +54,12 @@ class WindowsTrayService with TrayListener {
   Future<void> dispose() async {
     trayManager.removeListener(this);
     _messageTimer?.cancel();
+    await _actions.close();
   }
 
   @override
   void onTrayIconMouseDown() async {
-    final isVisible = await windowManager.isVisible();
-    if (isVisible) {
-      await windowManager.hide();
-    } else {
-      await windowManager.show();
-      await windowManager.focus();
-    }
+    _actions.add(const TrayAction(TrayActionType.toggleWindow));
   }
 
   @override
@@ -72,16 +71,15 @@ class WindowsTrayService with TrayListener {
   void onTrayMenuItemClick(MenuItem menuItem) {
     final key = menuItem.key ?? '';
     if (key == 'toggle') {
-      onToggleConnection();
+      _actions.add(const TrayAction(TrayActionType.toggleConnection));
       return;
     }
     if (key == 'show') {
-      windowManager.show();
-      windowManager.focus();
+      _actions.add(const TrayAction(TrayActionType.showWindow));
       return;
     }
     if (key == 'exit') {
-      onExit();
+      _actions.add(const TrayAction(TrayActionType.exitApp));
       return;
     }
     if (key.startsWith('node:')) {
@@ -90,7 +88,7 @@ class WindowsTrayService with TrayListener {
         (n) => n.id == id,
         orElse: () => _current ?? _nodes.first,
       );
-      onSelectNode(node);
+      _actions.add(TrayAction(TrayActionType.selectNode, node: node));
     }
   }
 

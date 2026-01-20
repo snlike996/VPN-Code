@@ -67,8 +67,8 @@ class SingboxConfigService {
   }
 
   Future<SingboxConfigResult> prepareConfig(SingboxConfigItem config) async {
-    final content = await _resolveContent(config);
-    final proxyPort = _parseProxyPort(content);
+    final content = await resolveContent(config);
+    final proxyPort = parseProxyPort(content);
     final path = await _writeConfig(content);
     return SingboxConfigResult(
       config: config,
@@ -77,7 +77,7 @@ class SingboxConfigService {
     );
   }
 
-  Future<String> _resolveContent(SingboxConfigItem config) async {
+  Future<String> resolveContent(SingboxConfigItem config) async {
     if (config.type == 'subscription_url') {
       final response = await _dio.get<String>(
         config.content,
@@ -88,7 +88,7 @@ class SingboxConfigService {
     return config.content.trim();
   }
 
-  int? _parseProxyPort(String content) {
+  int? parseProxyPort(String content) {
     try {
       final decoded = jsonDecode(content);
       if (decoded is! Map<String, dynamic>) {

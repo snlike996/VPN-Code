@@ -3,7 +3,11 @@ import 'dart:convert';
 import '../../core/models/proxy_node.dart';
 
 class WindowsVpnConfigBuilder {
-  static String build(ProxyNode node, {int? localProxyPort}) {
+  static String build(
+    ProxyNode node, {
+    int? localProxyPort,
+    String? logOutputPath,
+  }) {
     final parsed = _parse(node.raw);
     if (parsed == null) {
       throw StateError('Unsupported node format: ${node.raw}');
@@ -33,9 +37,7 @@ class WindowsVpnConfigBuilder {
     }
 
     final config = <String, dynamic>{
-      'log': {
-        'level': 'info',
-      },
+      'log': _buildLog(logOutputPath),
       'dns': {
         'servers': [
           {
@@ -75,7 +77,7 @@ class WindowsVpnConfigBuilder {
     return const JsonEncoder.withIndent('  ').convert(config);
   }
 
-  static String buildTestConfig(ProxyNode node) {
+  static String buildTestConfig(ProxyNode node, {String? logOutputPath}) {
     final parsed = _parse(node.raw);
     if (parsed == null) {
       throw StateError('Unsupported node format: ${node.raw}');
@@ -83,9 +85,7 @@ class WindowsVpnConfigBuilder {
 
     final outbound = _buildOutbound(parsed);
     final config = <String, dynamic>{
-      'log': {
-        'level': 'info',
-      },
+      'log': _buildLog(logOutputPath),
       'outbounds': [
         outbound,
         {
@@ -103,6 +103,16 @@ class WindowsVpnConfigBuilder {
     };
 
     return const JsonEncoder.withIndent('  ').convert(config);
+  }
+
+  static Map<String, dynamic> _buildLog(String? logOutputPath) {
+    final log = <String, dynamic>{
+      'level': 'debug',
+    };
+    if (logOutputPath != null && logOutputPath.isNotEmpty) {
+      log['output'] = logOutputPath;
+    }
+    return log;
   }
 
   static Map<String, dynamic> _buildOutbound(_ParsedNode parsed) {
