@@ -7,19 +7,24 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../controller/auth_controller.dart';
 import '../../controller/v2ray_vpn_controller.dart';
+import '../../core/onboarding/onboarding_controller.dart';
+import '../../core/onboarding/onboarding_state.dart';
 import '../../core/models/country_item.dart';
 import '../../core/connection/connection_controller.dart';
 import '../../core/models/proxy_node.dart';
 import '../../core/selector/node_selector.dart';
 import '../../core/speedtest/windows_real_tester.dart';
+import '../../data/repository/v2ray_repo.dart';
+import '../../di_container.dart' as di;
 import '../../platform/windows/admin_check.dart';
 import '../../platform/windows/autostart.dart';
 import '../../platform/windows/connection_adapter.dart';
 import '../../platform/windows/system_proxy.dart';
 import '../../platform/windows/tray_service.dart';
 import '../../platform/windows/privilege_helper.dart';
-import 'windows_app.dart';
 import '../../ui/shared/auth/signin_screen.dart';
+import 'onboarding/onboarding_wizard.dart';
+import 'windows_app.dart';
 
 class WindowsHomeScreen extends StatefulWidget {
   final ConnectionController controller;
@@ -41,10 +46,12 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
     with WindowListener {
   late final AuthController _authController;
   late final V2rayVpnController _controller;
+  OnboardingController? _onboardingController;
   late final WindowsTrayService _trayService;
   CountryItem? _selectedCountry;
   ProxyNode? _selectedNode;
   bool _isTesting = false;
+  bool _showOnboarding = false;
   bool _closeToTray = true;
   bool _autoStart = false;
   bool _dnsProtect = true;
@@ -82,6 +89,8 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         widget.controller.notifications.listen(_handleNotification);
     _loadSettings();
 
+    Future<void>.microtask(_initOnboarding);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!WindowsPrivilege.isAdmin()) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +104,7 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   void dispose() {
     _autoConnectTimer?.cancel();
     _notificationSubscription?.cancel();
+    _onboardingController?.removeListener(_handleOnboardingStateChange);
     widget.controller.status.removeListener(_syncTrayState);
     widget.controller.status.removeListener(_handleStatusChange);
     windowManager.removeListener(this);
@@ -130,6 +140,86 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       return;
     }
     await _connectSelected();
+  }
+
+  Future<void> _initOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) {
+      return;
+    }
+    _onboardingController = OnboardingController(
+      repo: di.sl<V2rayVpnRepo>(),
+      prefs: prefs,
+      connector: _connectFromOnboarding,
+    )..addListener(_handleOnboardingStateChange);
+    await _maybeStartOnboarding();
+  }
+
+  Future<void> _maybeStartOnboarding({bool force = false}) async {
+    final onboarding = _onboardingController;
+    if (onboarding == null) {
+      return;
+    }
+    final token = await _authController.getAuthToken();
+    if (token.isEmpty) {
+      return;
+    }
+    if (force) {
+      onboarding.reset();
+    }
+    final started = await onboarding.startIfNeeded();
+    if (started && mounted) {
+      setState(() {
+        _showOnboarding = true;
+      });
+    }
+  }
+
+  Future<bool> _connectFromOnboarding(ProxyNode node) async {
+    if (!mounted) {
+      return false;
+    }
+    setState(() {
+      _selectedNode = node;
+    });
+    await _syncTrayState();
+    try {
+      await widget.controller.connect(node, silent: _silentLaunch);
+      return widget.controller.status.value == ConnectionStatus.connected;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Connect failed: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  void _handleOnboardingStateChange() {
+    final onboarding = _onboardingController;
+    if (onboarding == null || !mounted) {
+      return;
+    }
+    final step = onboarding.state.step;
+    if (step == OnboardingStep.done) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('最佳节点已连接')),
+      );
+      setState(() {
+        _showOnboarding = false;
+      });
+    }
+    if (step == OnboardingStep.skipped) {
+      setState(() {
+        _showOnboarding = false;
+      });
+    }
+    if (step == OnboardingStep.failed) {
+      setState(() {
+        _showOnboarding = true;
+      });
+    }
   }
 
   Future<void> _connectSelected() async {
@@ -387,8 +477,19 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
             onPressed: () async {
               await Get.to(() => const SignInScreen());
               _controller.getCountries();
+              await _maybeStartOnboarding();
             },
             icon: const Icon(Icons.login),
+          ),
+          IconButton(
+            tooltip: 'Onboarding',
+            onPressed: () {
+              setState(() {
+                _showOnboarding = true;
+              });
+              _maybeStartOnboarding(force: true);
+            },
+            icon: const Icon(Icons.auto_awesome),
           ),
           IconButton(
             tooltip: 'Retest nodes',
@@ -425,16 +526,33 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
           ),
         ],
       ),
-      body: Row(
+      body: Stack(
         children: [
-          SizedBox(
-            width: 240,
-            child: _buildCountryList(),
+          Row(
+            children: [
+              SizedBox(
+                width: 240,
+                child: _buildCountryList(),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: _buildNodeList(),
+              ),
+            ],
           ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: _buildNodeList(),
-          ),
+          if (_showOnboarding && _onboardingController != null)
+            Positioned(
+              right: 24,
+              top: 24,
+              child: OnboardingWizard(
+                controller: _onboardingController!,
+                onClose: () {
+                  setState(() {
+                    _showOnboarding = false;
+                  });
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -721,6 +839,17 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
               widget.adapter.vpnManager.dnsProtectionEnabled = value;
               final prefs = await SharedPreferences.getInstance();
               await prefs.setBool('win_dns_protect', value);
+            },
+          ),
+          ListTile(
+            title: const Text('Run onboarding'),
+            subtitle: const Text('Re-run first time setup'),
+            trailing: const Icon(Icons.auto_awesome),
+            onTap: () async {
+              setState(() {
+                _showOnboarding = true;
+              });
+              await _maybeStartOnboarding(force: true);
             },
           ),
         ],
