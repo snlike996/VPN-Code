@@ -5,7 +5,6 @@ import '../../core/connection/connection_controller.dart';
 import '../../core/models/proxy_node.dart';
 import '../../core/singbox/singbox_config_service.dart';
 import 'pac_server.dart';
-import 'system_proxy.dart';
 import 'vpn_process.dart';
 import 'singbox_worker.dart';
 
@@ -15,7 +14,6 @@ class WindowsConnectionAdapter implements ConnectionAdapter {
     this.singboxService,
   }) {
     _exitSubscription = vpnManager.unexpectedExitStream.listen((_) async {
-      await _restoreProxy();
       await pacServer.stop();
       _unexpectedDisconnectController.add(null);
     });
