@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../controller/auth_controller.dart';
+import '../../controller/profile_controller.dart';
 import '../../controller/v2ray_vpn_controller.dart';
 import '../../core/models/country_item.dart';
 import '../../core/connection/connection_controller.dart';
@@ -18,6 +20,9 @@ import '../../platform/windows/connection_adapter.dart';
 import '../../platform/windows/system_proxy.dart';
 import '../../platform/windows/tray_service.dart';
 import '../../platform/windows/privilege_helper.dart';
+import 'dialogs/login_dialog.dart';
+import 'dialogs/profile_dialog.dart';
+import 'dialogs/settings_dialog.dart';
 import 'windows_app.dart';
 
 class WindowsHomeScreen extends StatefulWidget {
@@ -56,15 +61,17 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   Timer? _autoConnectTimer;
   StreamSubscription<String>? _notificationSubscription;
   StreamSubscription<String>? _configNoticeSubscription;
-  bool _settingsDirty = false;
   bool _lastConnectFailed = false;
   int _reconnectFailureCount = 0;
+  bool _isLoggedIn = false;
+  String _userLabel = '登录';
 
   @override
   void initState() {
     super.initState();
     _controller = Get.find<V2rayVpnController>();
     _controller.getCountries();
+    _refreshAuthState();
     _silentLaunch = widget.launchOptions.silent || widget.launchOptions.autoConnect;
 
     _trayService = WindowsTrayService(
@@ -158,6 +165,14 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
   Future<void> _connectSelected() async {
     final node = _selectedNode;
     if (node == null) {
+      return;
+    }
+    if (!_isLoggedIn) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
       return;
     }
     if (!node.available) {
@@ -465,56 +480,20 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         },
         child: Scaffold(
           appBar: AppBar(
-        title: const Text('TSVPN · Windows'),
-        actions: [
-          IconButton(
-            tooltip: '重新测速',
-            onPressed: _isTesting ? null : () => _runSpeedTest(force: true),
-            icon: const Icon(Icons.speed),
-          ),
-          ValueListenableBuilder<bool>(
-            valueListenable: widget.controller.networkAvailable,
-            builder: (context, isNetworkAvailable, _) {
-              return ValueListenableBuilder<ConnectionStatus>(
-                valueListenable: widget.controller.status,
-                builder: (context, state, _) {
-                  final connectedLabel = _selectedNode?.displayName == null
-                      ? '已连接'
-                      : '已连接 · ${_selectedNode?.displayName}';
-                  final label = state == ConnectionStatus.connected
-                      ? connectedLabel
-                      : state == ConnectionStatus.starting
-                          ? '正在连接…'
-                          : state == ConnectionStatus.reconnecting
-                              ? (isNetworkAvailable
-                                  ? '网络波动，正在重连…'
-                                  : '网络中断，等待恢复…')
-                              : _lastConnectFailed
-                                  ? '连接失败'
-                                  : '未连接';
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: ElevatedButton(
-                      onPressed: state == ConnectionStatus.starting ||
-                              state == ConnectionStatus.reconnecting
-                          ? null
-                          : () async {
-                              if (state == ConnectionStatus.connected) {
-                                await widget.controller.disconnect(
-                                  userInitiated: true,
-                                );
-                              } else {
-                                await _connectSelected();
-                              }
-                            },
-                      child: Text(label),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ],
+            title: const Text('TSVPN · Windows'),
+            actions: [
+              // 1. Connection status display (read-only)
+              _buildConnectionStatusIndicator(),
+              const SizedBox(width: 16),
+              
+              // 2. Login/Profile button
+              _buildUserButton(),
+              const SizedBox(width: 8),
+              
+              // 3. Settings button
+              _buildSettingsButton(),
+              const SizedBox(width: 16),
+            ],
           ),
           body: Row(
             children: [
@@ -579,9 +558,10 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
 
         final bestNode = NodeSelector.pickBest(nodes);
 
+
         return Column(
           children: [
-            _buildSettingsCard(),
+            _buildConnectAction(),
             if (_isTesting)
               const Padding(
                 padding: EdgeInsets.all(12),
@@ -604,13 +584,15 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                   final node = nodes[index];
                   final selected = _selectedNode?.id == node.id;
                   final best = bestNode?.id == node.id;
-                  final available = node.available;
+                  final available = node.available && _isLoggedIn;
                   final titleStyle =
                       available ? null : const TextStyle(color: Colors.grey);
                   final subtitle = available
                       ? Text(node.type.toUpperCase())
                       : Tooltip(
-                          message: '该节点当前无法连接，请稍后重试',
+                          message: _isLoggedIn
+                              ? '该节点当前无法连接，请稍后重试'
+                              : '请先登录',
                           child: const Text(
                             '不可用',
                             style: TextStyle(color: Colors.redAccent),
@@ -624,10 +606,11 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
                     onTap: available
                         ? () => _selectNode(node)
                         : () {
+                            final msg = _isLoggedIn
+                                ? '该节点当前不可用，请稍后重试。'
+                                : '请先登录';
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('该节点当前不可用，请稍后重试。'),
-                              ),
+                              SnackBar(content: Text(msg)),
                             );
                           },
                   );
@@ -638,285 +621,6 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
         );
       },
     );
-  }
-
-  Widget _buildSettingsCard() {
-    return Card(
-      margin: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          SwitchListTile(
-            title: const Text('关闭后最小化到托盘'),
-            value: _closeToTray,
-            onChanged: (value) async {
-              setState(() {
-                _closeToTray = value;
-              });
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('win_close_to_tray', value);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('开机启动'),
-            value: _autoStart,
-            onChanged: (value) async {
-              try {
-                if (value) {
-                  await WindowsAutoStart.enableAutoStart(autoConnect: _autoConnect);
-                } else {
-                  await WindowsAutoStart.disableAutoStart();
-                }
-                setState(() {
-                  _autoStart = value;
-                });
-              } catch (e) {
-                if (!mounted) {
-                  return;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('开机启动设置失败：$e')),
-                );
-              }
-            },
-          ),
-          SwitchListTile(
-            title: const Text('开机后自动连接'),
-            value: _autoConnect,
-            onChanged: (value) async {
-              setState(() {
-                _autoConnect = value;
-              });
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('win_auto_connect', value);
-              if (_autoStart) {
-                try {
-                  await WindowsAutoStart.enableAutoStart(autoConnect: value);
-                } catch (e) {
-                  if (!mounted) {
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('更新开机启动失败：$e')),
-                  );
-                }
-              }
-            },
-          ),
-          if (_autoConnect)
-            ListTile(
-              title: const Text('自动连接国家'),
-              trailing: DropdownButton<String>(
-                value: _autoConnectCountryMode,
-                items: const [
-                  DropdownMenuItem(value: 'last', child: Text('上次使用')),
-                  DropdownMenuItem(value: 'fixed', child: Text('固定国家')),
-                ],
-                onChanged: (value) async {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() {
-                    _autoConnectCountryMode = value;
-                  });
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('win_auto_country_mode', value);
-                },
-              ),
-            ),
-          if (_autoConnect && _autoConnectCountryMode == 'fixed')
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _fixedCountryCode,
-                hint: const Text('选择国家'),
-                items: _controller.countries
-                    .map(
-                      (country) => DropdownMenuItem(
-                        value: country.code,
-                        child: Text(country.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) async {
-                  setState(() {
-                    _fixedCountryCode = value;
-                  });
-                  final prefs = await SharedPreferences.getInstance();
-                  if (value == null) {
-                    await prefs.remove('win_auto_country_code');
-                  } else {
-                    await prefs.setString('win_auto_country_code', value);
-                  }
-                },
-              ),
-            ),
-          if (_autoConnect)
-            SwitchListTile(
-              title: const Text('失败后持续重试'),
-              value: _autoConnectRetry,
-              onChanged: (value) async {
-                setState(() {
-                  _autoConnectRetry = value;
-                });
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('win_auto_connect_retry', value);
-              },
-            ),
-          ListTile(
-            title: const Text('系统代理模式'),
-            trailing: DropdownButton<ProxyMode>(
-              value: _proxyMode,
-              items: const [
-                DropdownMenuItem(value: ProxyMode.off, child: Text('关闭')),
-                DropdownMenuItem(value: ProxyMode.global, child: Text('全局')),
-                DropdownMenuItem(value: ProxyMode.pac, child: Text('PAC')),
-              ],
-              onChanged: (value) async {
-                if (value == null) {
-                  return;
-                }
-                setState(() {
-                  _proxyMode = value;
-                });
-                widget.adapter.proxyMode = value;
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('win_proxy_mode', value.name);
-                _markSettingsDirty();
-                await _promptReconnectIfNeeded();
-              },
-            ),
-          ),
-          SwitchListTile(
-            title: const Text('断开后恢复系统代理'),
-            value: _restoreProxy,
-            onChanged: (value) async {
-              if (!value) {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('关闭恢复系统代理？'),
-                    content: const Text('关闭后可能导致系统代理无法自动恢复。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('确认'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true) {
-                  return;
-                }
-              }
-              setState(() {
-                _restoreProxy = value;
-              });
-              widget.adapter.restoreProxyOnDisconnect = value;
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('win_restore_proxy', value);
-              _markSettingsDirty();
-              await _promptReconnectIfNeeded();
-            },
-          ),
-          SwitchListTile(
-            title: const Text('DNS 防泄漏'),
-            subtitle: const Text('关闭可能导致 DNS 泄漏'),
-            value: _dnsProtect,
-            onChanged: (value) async {
-              setState(() {
-                _dnsProtect = value;
-              });
-              widget.adapter.vpnManager.dnsProtectionEnabled = value;
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('win_dns_protect', value);
-              _markSettingsDirty();
-              await _promptReconnectIfNeeded();
-            },
-          ),
-          if (_settingsDirty)
-            const Padding(
-              padding: EdgeInsets.only(left: 16, right: 16, bottom: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '部分设置将在重新连接后生效',
-                  style: TextStyle(color: Colors.orange),
-                ),
-              ),
-            ),
-          ExpansionTile(
-            title: const Text('Sing-box 配置'),
-            subtitle: Text(
-              widget.adapter.activeConfig?.name ?? '未选择',
-            ),
-            children: [
-              if (widget.adapter.availableConfigs.isEmpty)
-                const ListTile(
-                  title: Text('暂无配置'),
-                  subtitle: Text('连接一次后会自动拉取配置'),
-                )
-              else
-                ...widget.adapter.availableConfigs.map(
-                  (config) => ListTile(
-                    title: Text(config.name),
-                    subtitle: Text(config.type),
-                    trailing: widget.adapter.activeConfig?.id == config.id
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : null,
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _markSettingsDirty() {
-    if (_settingsDirty) {
-      return;
-    }
-    setState(() {
-      _settingsDirty = true;
-    });
-  }
-
-  Future<void> _promptReconnectIfNeeded() async {
-    if (widget.controller.status.value != ConnectionStatus.connected) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('立即重新连接？'),
-        content: const Text('是否现在重新连接以应用新设置？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('稍后'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('重新连接'),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await widget.controller.disconnect(userInitiated: false);
-      await _connectSelected();
-      setState(() {
-        _settingsDirty = false;
-      });
-    }
   }
 
   Future<void> _showTrayHintIfNeeded() async {
@@ -984,6 +688,353 @@ class _WindowsHomeScreenState extends State<WindowsHomeScreen>
       widget.adapter.localProxyPort = lastProxyPort;
     }
     await _maybeAutoConnect();
+  }
+
+  // ----- Top App Bar Components -----
+
+  Widget _buildConnectionStatusIndicator() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.controller.networkAvailable,
+      builder: (context, isNetworkAvailable, _) {
+        return ValueListenableBuilder<ConnectionStatus>(
+          valueListenable: widget.controller.status,
+          builder: (context, status, _) {
+            final isConnected = status == ConnectionStatus.connected;
+            final isConnecting = status == ConnectionStatus.starting ||
+                status == ConnectionStatus.reconnecting;
+
+            Color color;
+            IconData icon;
+            String label;
+
+            if (isConnected) {
+              color = Colors.green;
+              icon = Icons.check_circle;
+              final nodeName = _selectedNode?.displayName;
+              label = nodeName == null ? '已连接' : '已连接 · $nodeName';
+            } else if (isConnecting) {
+              color = Colors.orange;
+              icon = Icons.autorenew;
+              label = status == ConnectionStatus.reconnecting
+                  ? (isNetworkAvailable
+                      ? '网络波动，正在重连…'
+                      : '网络中断，等待恢复…')
+                  : '正在连接…';
+            } else if (_lastConnectFailed) {
+              color = Colors.red;
+              icon = Icons.error_outline;
+              label = '连接失败';
+            } else {
+              color = Colors.grey;
+              icon = Icons.circle_outlined;
+              label = '未连接';
+            }
+
+            return Tooltip(
+              message: '当前连接状态',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: color),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserButton() {
+    if (!_isLoggedIn) {
+      return TextButton.icon(
+        onPressed: _showLoginDialog,
+        icon: const Icon(Icons.login, size: 18),
+        label: const Text('登录'),
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.blue,
+        ),
+      );
+    }
+
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 40),
+      tooltip: '个人中心',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.account_circle, size: 20, color: Colors.blue),
+            const SizedBox(width: 6),
+            Text(
+              _userLabel,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue,
+              ),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(Icons.person, size: 18),
+              SizedBox(width: 8),
+              Text('个人中心'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18),
+              SizedBox(width: 8),
+              Text('退出登录'),
+            ],
+          ),
+        ),
+      ],
+      onSelected: (value) {
+        if (value == 'profile') {
+          _showProfileDialog();
+        } else if (value == 'logout') {
+          _handleLogout();
+        }
+      },
+    );
+  }
+
+  Widget _buildSettingsButton() {
+    return IconButton(
+      tooltip: '设置',
+      onPressed: _showSettingsDialog,
+      icon: const Icon(Icons.settings),
+    );
+  }
+
+  // ----- Dialog Handlers -----
+
+  Future<void> _showLoginDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => WindowsLoginDialog(
+        onLoginSuccess: () {
+          // Refresh countries after login
+          _controller.getCountries();
+          _refreshAuthState();
+        },
+      ),
+    );
+  }
+
+  Future<void> _showProfileDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => const WindowsProfileDialog(),
+    );
+    await _refreshAuthState();
+  }
+
+  Future<void> _showSettingsDialog() async {
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => WindowsSettingsDialog(
+        closeToTray: _closeToTray,
+        autoStart: _autoStart,
+        autoConnect: _autoConnect,
+        autoConnectRetry: _autoConnectRetry,
+        autoConnectCountryMode: _autoConnectCountryMode,
+        fixedCountryCode: _fixedCountryCode,
+        proxyMode: _proxyMode,
+        restoreProxy: _restoreProxy,
+        dnsProtect: _dnsProtect,
+        countries: _controller.countries,
+        onSave: (settings) async {
+          // Apply settings
+          setState(() {
+            _closeToTray = settings['closeToTray'];
+            _autoStart = settings['autoStart'];
+            _autoConnect = settings['autoConnect'];
+            _autoConnectRetry = settings['autoConnectRetry'];
+            _autoConnectCountryMode = settings['autoConnectCountryMode'];
+            _fixedCountryCode = settings['fixedCountryCode'];
+            _proxyMode = settings['proxyMode'];
+            _restoreProxy = settings['restoreProxy'];
+            _dnsProtect = settings['dnsProtect'];
+          });
+
+          // Save to preferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('win_close_to_tray', _closeToTray);
+          await prefs.setBool('win_auto_connect', _autoConnect);
+          await prefs.setBool('win_auto_connect_retry', _autoConnectRetry);
+          await prefs.setString('win_auto_country_mode', _autoConnectCountryMode);
+          if (_fixedCountryCode != null) {
+            await prefs.setString('win_auto_country_code', _fixedCountryCode!);
+          } else {
+            await prefs.remove('win_auto_country_code');
+          }
+          await prefs.setString('win_proxy_mode', _proxyMode.name);
+          await prefs.setBool('win_restore_proxy', _restoreProxy);
+          await prefs.setBool('win_dns_protect', _dnsProtect);
+
+          // Apply to adapter
+          widget.adapter.proxyMode = _proxyMode;
+          widget.adapter.restoreProxyOnDisconnect = _restoreProxy;
+          widget.adapter.vpnManager.dnsProtectionEnabled = _dnsProtect;
+
+          // Prompt for reconnection if needed
+          if (widget.controller.status.value == ConnectionStatus.connected) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('立即重新连接？'),
+                content: const Text('是否现在重新连接以应用新设置？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('稍后'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('重新连接'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              await widget.controller.disconnect(userInitiated: false);
+              await _connectSelected();
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('退出登录将断开当前连接，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认退出'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // Disconnect if connected
+      if (widget.controller.status.value == ConnectionStatus.connected) {
+        await widget.controller.disconnect(userInitiated: true);
+      }
+
+      // Logout
+      await Get.find<AuthController>().removeUserToken();
+      
+      // Refresh UI
+      if (!mounted) return;
+      setState(() {
+        _isLoggedIn = false;
+        _userLabel = '登录';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已退出登录')),
+      );
+    }
+  }
+
+  Widget _buildConnectAction() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          ElevatedButton.icon(
+            onPressed: _isLoggedIn
+                ? () async {
+                    final state = widget.controller.status.value;
+                    if (state == ConnectionStatus.connected) {
+                      await widget.controller.disconnect(userInitiated: true);
+                    } else {
+                      await _connectSelected();
+                    }
+                  }
+                : _showLoginDialog,
+            icon: const Icon(Icons.power_settings_new),
+            label: Text(
+              widget.controller.status.value == ConnectionStatus.connected
+                  ? '断开'
+                  : '连接',
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (!_isLoggedIn)
+            const Text(
+              '登录后可连接节点',
+              style: TextStyle(color: Colors.black54),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshAuthState() async {
+    final authController = Get.find<AuthController>();
+    final profileController = Get.find<ProfileController>();
+    final token = await authController.getAuthToken();
+    final loggedIn = token.isNotEmpty;
+    String label = '登录';
+    if (loggedIn) {
+      await profileController.getProfileData();
+      final data = profileController.profileData;
+      if (data is Map && data['email'] != null) {
+        label = data['email'].toString();
+      } else {
+        label = '已登录';
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isLoggedIn = loggedIn;
+      _userLabel = label;
+    });
   }
 }
 
