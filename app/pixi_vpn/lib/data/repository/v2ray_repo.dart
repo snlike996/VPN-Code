@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/app_strings.dart';
 import '../datasource/remote/dio/dio_client.dart';
@@ -11,9 +14,16 @@ class V2rayVpnRepo {
 
   V2rayVpnRepo({required this.dioClient, required this.secureStorage});
 
+  Future<String?> _readToken() async {
+    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      return dioClient.sharedPreferences.getString(AppStrings.tokenKey);
+    }
+    return secureStorage.read(key: AppStrings.tokenKey);
+  }
+
   Future<ApiResponse> getCountries() async {
     try {
-      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      String? token = await _readToken();
       final headers = <String, String>{
         "Accept": "application/json",
       };
@@ -34,7 +44,7 @@ class V2rayVpnRepo {
 
   Future<ApiResponse> getSubscriptionContent(String countryCode) async {
     try {
-      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      String? token = await _readToken();
       final headers = <String, String>{
         "Accept": "text/plain",
       };

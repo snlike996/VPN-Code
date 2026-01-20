@@ -115,10 +115,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return _buildNotLoggedInUI();
                 }
 
-                if (profileController.isLoading || profileController.profileData == null) {
-                  return const Center(child: CircularProgressIndicator(color: Colors.blue,
-                  strokeWidth: 2,
-                  ));
+                if (profileController.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.blue,
+                      strokeWidth: 2,
+                    ),
+                  );
+                }
+
+                if (profileController.profileData == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('个人中心加载失败'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await profileController.getProfileData();
+                          },
+                          child: const Text('重试'),
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
                 final data = profileController.profileData!;

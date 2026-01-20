@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/app_strings.dart';
 import '../datasource/remote/dio/dio_client.dart';
@@ -11,9 +14,16 @@ class ProfileRepo {
 
   ProfileRepo({required this.dioClient, required this.secureStorage});
 
+  Future<String?> _readToken() async {
+    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      return dioClient.sharedPreferences.getString(AppStrings.tokenKey);
+    }
+    return secureStorage.read(key: AppStrings.tokenKey);
+  }
+
   Future<ApiResponse> getProfileData() async {
     try {
-      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      String? token = await _readToken();
       Response response = await dioClient.get(
         AppStrings.profileUrl,
         options: Options(headers: {
@@ -29,12 +39,12 @@ class ProfileRepo {
 
   cancelSubscription() async {
     try {
+      String? token = await _readToken();
       Response response = await dioClient.post(
         AppStrings.subscriptionCancelUrl,
         options: Options(headers: {
           "Content-Type": "application/json",
-          "Authorization":
-          "Bearer ${ secureStorage.read(key: AppStrings.tokenKey)}",
+          "Authorization": "Bearer $token",
         }),
       );
       return ApiResponse.withSuccess(response);
@@ -45,7 +55,7 @@ class ProfileRepo {
 
   Future<ApiResponse> submitRedeemCode({required String code}) async {
     try {
-      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      String? token = await _readToken();
       Response response = await dioClient.post(
         AppStrings.redeemCodeUrl,
         data: {"code": code},
@@ -62,7 +72,7 @@ class ProfileRepo {
 
   Future<ApiResponse> getRedeemStatus() async {
     try {
-      String? token = await secureStorage.read(key: AppStrings.tokenKey);
+      String? token = await _readToken();
       Response response = await dioClient.get(
         AppStrings.redeemStatusUrl,
         options: Options(headers: {
