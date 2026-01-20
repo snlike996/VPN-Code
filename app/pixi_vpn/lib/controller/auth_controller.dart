@@ -41,7 +41,7 @@ class AuthController extends GetxController {
 
   // ================= REGISTER =================
 
-  register({
+  Future<bool> register({
     required String email,
     required String name,
     required String password,
@@ -72,7 +72,7 @@ class AuthController extends GetxController {
 
         if (success && token != null && token.isNotEmpty) {
           await authRepo.saveUserToken(token);
-          return apiResponse.response!.statusCode;
+          return true;
         }
       } else {
         _showToast(msg: "发生错误或用户数据无效", isSuccess: false);
@@ -84,11 +84,12 @@ class AuthController extends GetxController {
       isLoadingRegister = false;
       update();
     }
+    return false;
   }
 
   // ================= LOGIN =================
 
-  Future<void> login({
+  Future<bool> login({
     required String email,
     required String password,
     required String deviceId,
@@ -122,6 +123,7 @@ class AuthController extends GetxController {
 
           // Navigate based on selected protocol
           await _navigateToSelectedProtocol();
+          return true;
         }
       } else {
         _showToast(msg: "发生错误或用户数据无效", isSuccess: false);
@@ -133,6 +135,7 @@ class AuthController extends GetxController {
       isLoadingLogin = false;
       update();
     }
+    return false;
   }
 
   forgetPassword({dynamic email}) async {

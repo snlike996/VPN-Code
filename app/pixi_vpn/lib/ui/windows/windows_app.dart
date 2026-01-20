@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../app_flow/app_flow_root.dart';
 import '../../core/connection/connection_controller.dart';
 import '../../core/connection/network_monitor.dart';
 import '../../platform/windows/connection_adapter.dart';
 import '../../platform/windows/vpn_process.dart';
-import 'windows_home_screen.dart';
 
 class WindowsLaunchOptions {
   final bool silent;
@@ -58,7 +58,7 @@ class _WindowsAppState extends State<WindowsApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         useMaterial3: true,
       ),
-      home: WindowsHomeScreen(
+      home: AppFlowRoot(
         controller: _controller,
         adapter: _adapter,
         launchOptions: widget.launchOptions,

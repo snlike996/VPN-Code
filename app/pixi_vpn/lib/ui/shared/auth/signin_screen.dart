@@ -11,7 +11,22 @@ import 'forget_password_screen.dart';
 
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  final VoidCallback? onRegisterTap;
+  final VoidCallback? onLoginSuccess;
+  final VoidCallback? onBack;
+  final VoidCallback? onExit;
+  final bool showBack;
+  final bool showExit;
+
+  const SignInScreen({
+    super.key,
+    this.onRegisterTap,
+    this.onLoginSuccess,
+    this.onBack,
+    this.onExit,
+    this.showBack = false,
+    this.showExit = false,
+  });
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -59,13 +74,24 @@ class _SignInScreenState extends State<SignInScreen> {
         return Scaffold(
           // White background for the whole screen
           backgroundColor: Colors.white,
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 1,
-            ),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            toolbarHeight: (widget.showBack || widget.showExit) ? kToolbarHeight : 1,
+            leading: widget.showBack
+                ? IconButton(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back),
+                  )
+                : null,
+            actions: widget.showExit
+                ? [
+                    IconButton(
+                      onPressed: widget.onExit,
+                      icon: const Icon(Icons.close),
+                    ),
+                  ]
+                : null,
           ),
           body: SafeArea(
             child: SingleChildScrollView(
@@ -213,13 +239,20 @@ class _SignInScreenState extends State<SignInScreen> {
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (_formKey.currentState?.validate() ?? false) {
 
                                   final email = _emailController.text.trim();
                                   final password = _passwordController.text.trim();
 
-                                  authController.login(email: email, password: password, deviceId: deviceId ?? 'unknown_device');
+                                  final success = await authController.login(
+                                    email: email,
+                                    password: password,
+                                    deviceId: deviceId ?? 'unknown_device',
+                                  );
+                                  if (success && widget.onLoginSuccess != null) {
+                                    widget.onLoginSuccess!();
+                                  }
                                 }
                               },
                               style: ElevatedButton.styleFrom(
@@ -264,6 +297,10 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ),
                                 TextButton(
                                   onPressed: () {
+                                    if (widget.onRegisterTap != null) {
+                                      widget.onRegisterTap!();
+                                      return;
+                                    }
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -302,4 +339,3 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 }
-
