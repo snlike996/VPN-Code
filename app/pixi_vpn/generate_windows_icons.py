@@ -4,7 +4,7 @@ Generate Windows application icons from SVG
 Creates icons with black background and white logo in various sizes
 """
 
-from PIL import Image, ImageDraw
+from PIL import Image
 import cairosvg
 import io
 import os
@@ -26,29 +26,42 @@ def read_svg_and_modify(svg_path):
     
     return svg_content
 
-def generate_icon(svg_content, size, output_path):
-    """Generate a single icon with black background and white logo"""
-    # Convert SVG to PNG with transparency
+def _render_svg(svg_content, size):
     png_data = cairosvg.svg2png(
         bytestring=svg_content.encode('utf-8'),
         output_width=size,
         output_height=size
     )
-    
-    # Open the PNG
-    logo = Image.open(io.BytesIO(png_data)).convert('RGBA')
-    
-    # Create a new image with black background
+    return Image.open(io.BytesIO(png_data)).convert('RGBA')
+
+def _crop_to_content(img):
+    alpha = img.split()[-1]
+    bbox = alpha.getbbox()
+    if bbox is None:
+        return img
+    return img.crop(bbox)
+
+def generate_icon(svg_content, size, output_path, fill_ratio=0.92):
+    """Generate a single icon with black background and a tight, crisp logo."""
+    # Render large then crop to actual content to avoid SVG padding.
+    render_size = max(size * 4, 1024)
+    logo = _render_svg(svg_content, render_size)
+    logo = _crop_to_content(logo)
+
+    # Resize logo to fill most of the canvas (leave a small margin).
+    target = int(size * fill_ratio)
+    logo = logo.resize((target, target), Image.LANCZOS)
+
+    # Create a black background and center the logo.
     icon = Image.new('RGBA', (size, size), (0, 0, 0, 255))
-    
-    # Paste the logo on top
-    icon.paste(logo, (0, 0), logo)
-    
-    # Convert to RGB (remove alpha channel)
+    x = (size - target) // 2
+    y = (size - target) // 2
+    icon.paste(logo, (x, y), logo)
+
+    # Convert to RGB (remove alpha channel).
     icon_rgb = Image.new('RGB', (size, size), (0, 0, 0))
     icon_rgb.paste(icon, (0, 0))
-    
-    # Save
+
     icon_rgb.save(output_path, 'PNG')
     print(f"Generated: {output_path}")
 
